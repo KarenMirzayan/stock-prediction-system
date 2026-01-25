@@ -3,9 +3,9 @@ spring:
     name: news-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/predictions
-    username: postgres
-    password: 123123123
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -22,7 +22,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: 8080
+  port: ${SERVER_PORT}
 
 logging:
   level:
@@ -31,5 +31,5 @@ logging:
     com.rometools: WARN
 
 ollama:
-  url: http://localhost:11434
-  model: qwen2.5:14b
+  url: ${OLLAMA_URL}
+  model: ${OLLAMA_MODEL}
