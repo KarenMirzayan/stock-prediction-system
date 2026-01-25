@@ -11,6 +11,7 @@ import kz.kbtu.newsservice.repository.CountryRepository;
 import kz.kbtu.newsservice.repository.EconomySectorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -28,8 +29,11 @@ public class CompanyService {
     private final ObjectMapper objectMapper;
     
     private final WebClient webClient;
+
     private static final String OLLAMA_URL = "http://localhost:11434";
-    private static final String MODEL = "qwen2.5:14b";
+
+    @Value("${ollama.model:qwen2.5:14b}")
+    private final String MODEL = null;
 
     public CompanyService(CompanyRepository companyRepository, 
                          CountryRepository countryRepository,
