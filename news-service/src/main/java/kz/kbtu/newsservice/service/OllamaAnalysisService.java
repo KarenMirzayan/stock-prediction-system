@@ -3,12 +3,15 @@ package kz.kbtu.newsservice.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kz.kbtu.common.dto.ArticleAnalysisDto;
+import kz.kbtu.common.entity.EconomySector;
+import kz.kbtu.newsservice.repository.EconomySectorRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -16,6 +19,7 @@ public class OllamaAnalysisService {
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final EconomySectorRepository sectorRepository;
 
     @Value("${ollama.url:http://localhost:11434}")
     private String ollamaUrl;
@@ -23,7 +27,8 @@ public class OllamaAnalysisService {
     @Value("${ollama.model:qwen2.5:14b}")
     private String model;
 
-    public OllamaAnalysisService() {
+    public OllamaAnalysisService(EconomySectorRepository sectorRepository) {
+        this.sectorRepository = sectorRepository;
         this.webClient = WebClient.builder()
                 .baseUrl("http://localhost:11434")
                 .build();
@@ -48,99 +53,113 @@ public class OllamaAnalysisService {
         }
     }
 
+    private String getAvailableSectorsForPrompt() {
+        List<EconomySector> sectors = sectorRepository.findAll();
+
+        return sectors.stream()
+                .map(s -> s.getCode() + " (" + s.getName() + ")")
+                .collect(Collectors.joining(", "));
+    }
+
     private String buildAnalysisPrompt(String title, String content) {
+        String availableSectors = getAvailableSectorsForPrompt();
+
         return String.format("""
-    You are a market inference analyst.
-
-    Your task is NOT to summarize journalism or restate observed stock price movements.
-    Your task is to infer potential FUTURE market impact based on factual information in the article.
-
-    You must return ONLY valid JSON. No explanations outside JSON.
+    You are a market analyst. Analyze this article and produce predictions about future stock/market movements.
 
     TITLE: %s
     CONTENT: %s
 
-    CRITICAL INSTRUCTIONS — READ CAREFULLY:
+    AVAILABLE SECTOR CODES: %s
 
-    1. READ THE ENTIRE ARTICLE before producing output.
-       - If the article is retrospective, descriptive, or reports outcomes without introducing new,
-         actionable information, it is NON-PREDICTIVE.
-       - In such cases, set "predictions" to an empty array [].
-       - "No prediction" is a valid and correct outcome.
+    === OUTPUT RULES ===
 
-    2. DO NOT mechanically copy reported stock movements as predictions.
-       - You MAY use reported movements as forward-looking signals if there is a plausible trader reaction or market momentum effect.
-       - Always justify with reasoning: why would the market react next?
+    Return ONLY valid JSON. No text before or after.
 
-    3. CREATE PREDICTIONS ONLY when there is a clear forward-looking causal signal, such as:
-       - Earnings surprises with guidance implications
-       - Regulatory or legal actions affecting future cash flows
-       - Geopolitical events impacting commodities, supply chains, or risk appetite
-       - Structural industry shifts (AI adoption, capex cycles, demand inflection points)
+    === SCOPE SELECTION LOGIC ===
+
+    Ask yourself: "Who is DIRECTLY affected by this news?"
+
+    1. Is a SPECIFIC COMPANY the main subject?
+       → Use scope: "COMPANY", targets: ["TICKER"]
+       → News about earnings, layoffs, products, lawsuits, management of ONE company = COMPANY scope
+   
+    2. Are MULTIPLE SPECIFIC COMPANIES directly named and affected?
+       → Use scope: "MULTI_TICKER", targets: ["TICKER1", "TICKER2", ...]
+   
+    3. Is an ENTIRE INDUSTRY affected (not just one company)?
+       → Use scope: "SECTOR", targets: ["SECTOR_CODE"]
+       → Regulation affecting all companies in industry, industry-wide trends, commodity price changes
+       → One company's problems do NOT make the whole sector bearish
+   
+    4. Is a COUNTRY'S ECONOMY affected (trade policy, sanctions, political instability)?
+       → Use scope: "COUNTRY", targets: ["Country Name"]
+       → Optionally include sectors: ["AFFECTED_SECTOR"] if specific industries impacted
+
+    === CRITICAL LOGIC RULES ===
+
+    RULE 1: Company news → Company prediction
+    - If article is primarily about ONE company (layoffs, earnings, strategy change), predict for THAT COMPANY
+    - Do NOT generalize to sector unless article explicitly discusses industry-wide impact
     
-    4. When generating predictions, consider the following forward-looking signals:
-       - Positive Earnings Reports: If a company reports positive earnings, it can be a significant bullish signal for short-term stock performance.
-       - Forward-Looking Guidance: Include any forward-looking statements or significant financial metrics that exceed expectations and could impact future performance.
-       - Market Sentiment Indicators: Consider immediate market sentiment indicators, such as earnings reports, analyst reactions, or reported investor sentiment, to capture potential short-term impacts.
+    RULE 2: Distinguish company vs sector impact
+    - One company's internal changes (layoffs, restructuring, strategy shift) affect THAT COMPANY, not the entire sector
+    - Industry-wide regulation, policy changes, or commodity price shifts affect the SECTOR
+    - Ask: "Would competitors be affected the same way?" If no → COMPANY scope. If yes → SECTOR scope.
+    
+    RULE 3: Direction must match the target
+    - If predicting for a company and news is bad for that company → that company BEARISH
+    - If predicting for a sector, ask: "Is this bad for ALL companies in this sector?" If not, use COMPANY scope instead.
+    
+    RULE 4: Pivot/shift news requires nuance
+    - When a company shifts strategy from one area to another, consider separate predictions for each impact
+    - The abandoned area may face bearish pressure, the new focus area may see bullish sentiment
+    
+    RULE 5: No prediction is valid
+    - If article is retrospective, opinion, or has no actionable forward signal → empty predictions array
 
-    5. DETERMINE THE CORRECT SCOPE for each prediction:
-       - COMPANY → single firm-specific catalyst
-       - MULTI_TICKER → several companies affected by the same cause
-       - SECTOR → industry-wide impact
-       - ASSET_CLASS → commodities, bonds, FX, crypto
-       - MACRO_THEME → geopolitics, regulation, monetary policy
+    === CONFIDENCE GUIDELINES ===
+    
+    - 75-85%%: Direct, clear causal link between news and expected market movement
+    - 60-74%%: Reasonable inference but outcome could go either way
+    - Below 60%%: Speculative, use sparingly
 
-    6. DO NOT force company-level predictions.
-       - If impact is sectoral or macro, use SECTOR, MULTI_TICKER, ASSET_CLASS, or MACRO_THEME.
-       - If impact is unclear or mixed, either mark direction as NEUTRAL or omit prediction.
-
-    7. TIME HORIZON IS REQUIRED for every prediction:
-       - SHORT_TERM (days to weeks)
-       - MID_TERM (weeks to months)
-       - LONG_TERM (months to years)
-
-    8. CONFIDENCE RULES:
-       - Use confidence of 80%% or higher only for strong, direct, and well-supported causal links
-       - 60%%-75%% for reasonable but not guaranteed outcomes
-       - Below 60%% only if uncertainty is explicitly high
-       - Avoid exaggerated certainty
-
-    9. EVIDENCE REQUIREMENT:
-       - Every prediction must cite concrete facts from the article that justify the inference.
-       - No external knowledge or assumptions beyond the article.
-
-    10. COMPANIES FIELD:
-        - List stock tickers (e.g., AAPL, GOOGL, TSLA) for companies mentioned in the article
-        - Use uppercase standard ticker symbols
-
-    REQUIRED JSON OUTPUT (no other text):
+    === JSON STRUCTURE ===
 
     {
-      "summary": "Brief factual summary (2–4 sentences, no opinion)",
+      "summary": "2-4 sentence factual summary",
       "companies": ["TICKER1", "TICKER2"],
-      "countries": ["Country1", "Country2"],
-      "sectors": ["Technology", "Financial Services"],
+      "countries": ["Country1"],
+      "sectors": ["SECTOR_CODE1"],
       "sentiment": "POSITIVE | NEGATIVE | NEUTRAL | MIXED",
       "predictions": [
         {
-          "scope": "COMPANY | MULTI_TICKER | SECTOR | ASSET_CLASS | MACRO_THEME",
-          "targets": ["TSLA", "NVDA"],
+          "scope": "COMPANY | MULTI_TICKER | SECTOR | COUNTRY",
+          "targets": ["TARGET"],
+          "countries": [],
+          "sectors": [],
           "direction": "BULLISH | BEARISH | NEUTRAL | MIXED | VOLATILE",
           "timeHorizon": "SHORT_TERM | MID_TERM | LONG_TERM",
           "confidence": 70,
-          "rationale": "Forward-looking causal explanation based strictly on article facts",
-          "evidence": [
-            "Specific factual trigger cited from the article"
-          ]
+          "rationale": "Why this target will move in this direction",
+          "evidence": ["Specific fact from article"]
         }
       ]
     }
 
-    REMEMBER:
-    - Fewer, higher-quality predictions are better than many weak ones.
-    - If a trader would not act on this information, do not produce a prediction.
-    - Companies should be stock ticker symbols, not full names.
-    """, title, content);
+    === FIELD RULES ===
+    
+    - companies: Stock tickers mentioned in the article. Always uppercase.
+    - countries: Countries mentioned by name
+    - sectors: Use CODES from the available sector list above, not full names
+    - predictions.targets: 
+      - COMPANY scope → single ticker
+      - MULTI_TICKER scope → multiple tickers
+      - SECTOR scope → sector codes from available list
+      - COUNTRY scope → country names
+    - predictions.countries: Only for SECTOR scope if specific countries affected
+    - predictions.sectors: Only for COUNTRY scope if specific sectors affected
+    """, title, content, availableSectors);
     }
 
     private String generate(String prompt) {
@@ -191,6 +210,8 @@ public class OllamaAnalysisService {
                     ArticleAnalysisDto.PredictionDto pred = ArticleAnalysisDto.PredictionDto.builder()
                             .scope(predNode.path("scope").asText("COMPANY"))
                             .targets(parseJsonArrayToList(predNode.path("targets")))
+                            .countries(parseJsonArrayToList(predNode.path("countries")))
+                            .sectors(parseJsonArrayToList(predNode.path("sectors")))
                             .direction(predNode.path("direction").asText("NEUTRAL"))
                             .timeHorizon(predNode.path("timeHorizon").asText(
                                     predNode.path("time_horizon").asText("SHORT_TERM")))

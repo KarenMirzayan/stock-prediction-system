@@ -23,30 +23,26 @@ public class FileStorageService {
 
     public void saveArticleToFile(String title, String url, String content) {
         try {
-            // Create output directory if it doesn't exist
             Path outputPath = Paths.get(OUTPUT_DIR);
             if (!Files.exists(outputPath)) {
                 Files.createDirectories(outputPath);
                 log.info("Created output directory: {}", OUTPUT_DIR);
             }
 
-            // Generate filename from title
             String sanitizedTitle = sanitizeFileName(title);
             String timestamp = LocalDateTime.now().format(FILE_NAME_FORMATTER);
             String fileName = String.format("%s_%s.txt", timestamp, sanitizedTitle);
 
             Path filePath = outputPath.resolve(fileName);
 
-            // Build file content
             StringBuilder fileContent = new StringBuilder();
-            fileContent.append("=" .repeat(80)).append("\n");
+            fileContent.append("=".repeat(80)).append("\n");
             fileContent.append("TITLE: ").append(title).append("\n");
             fileContent.append("URL: ").append(url).append("\n");
             fileContent.append("SCRAPED AT: ").append(LocalDateTime.now()).append("\n");
             fileContent.append("=".repeat(80)).append("\n\n");
             fileContent.append(content);
 
-            // Write to file
             Files.writeString(filePath, fileContent.toString(),
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
@@ -58,6 +54,7 @@ public class FileStorageService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public void saveArticleWithAnalysis(String title, String url, String content, Map<String, Object> analysis) {
         try {
             Path outputPath = Paths.get(OUTPUT_DIR);
@@ -81,27 +78,26 @@ public class FileStorageService {
             // Add LLM Analysis
             fileContent.append("=== LLM ANALYSIS ===\n\n");
             fileContent.append("Summary: ").append(analysis.getOrDefault("summary", "N/A")).append("\n\n");
-            fileContent.append("Companies: ").append(analysis.getOrDefault("companies", List.of())).append("\n");
-            fileContent.append("Countries: ").append(analysis.getOrDefault("countries", List.of())).append("\n");
-            fileContent.append("Sectors: ").append(analysis.getOrDefault("sectors", List.of())).append("\n");
+            fileContent.append("Companies: ").append(formatList(analysis.get("companies"))).append("\n");
+            fileContent.append("Countries: ").append(formatList(analysis.get("countries"))).append("\n");
+            fileContent.append("Sectors: ").append(formatList(analysis.get("sectors"))).append("\n");
             fileContent.append("Sentiment: ").append(analysis.getOrDefault("sentiment", "N/A")).append("\n\n");
 
             List<Map<String, Object>> predictions = (List<Map<String, Object>>)
                     analysis.getOrDefault("predictions", List.of());
 
             if (!predictions.isEmpty()) {
-                fileContent.append("Predictions:\n");
+                fileContent.append("=== PREDICTIONS ===\n\n");
+                int predNum = 1;
                 for (Map<String, Object> pred : predictions) {
-                    fileContent.append(String.format("  - %s: %s (Confidence: %d%%) - %s\n",
-                            pred.get("ticker"),
-                            pred.get("direction"),
-                            pred.get("confidence"),
-                            pred.get("reasoning")));
+                    fileContent.append(formatPrediction(pred, predNum++));
                 }
-                fileContent.append("\n");
+            } else {
+                fileContent.append("Predictions: None (article is non-predictive)\n\n");
             }
 
             fileContent.append("=".repeat(80)).append("\n\n");
+            fileContent.append("=== FULL ARTICLE ===\n\n");
             fileContent.append(content);
 
             Files.writeString(filePath, fileContent.toString(),
@@ -115,13 +111,102 @@ public class FileStorageService {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private String formatPrediction(Map<String, Object> pred, int number) {
+        StringBuilder sb = new StringBuilder();
+
+        String scope = String.valueOf(pred.getOrDefault("scope", "UNKNOWN"));
+        String direction = String.valueOf(pred.getOrDefault("direction", "NEUTRAL"));
+        Object confidenceObj = pred.getOrDefault("confidence", 0);
+        int confidence = confidenceObj instanceof Number ? ((Number) confidenceObj).intValue() : 0;
+        String timeHorizon = String.valueOf(pred.getOrDefault("timeHorizon", "SHORT_TERM"));
+        String rationale = String.valueOf(pred.getOrDefault("rationale", "N/A"));
+
+        // Header
+        sb.append(String.format("Prediction #%d [%s]\n", number, scope));
+        sb.append("-".repeat(40)).append("\n");
+
+        // Targets based on scope
+        switch (scope.toUpperCase()) {
+            case "COMPANY":
+                sb.append("  Company: ").append(formatList(pred.get("targets"))).append("\n");
+                break;
+            case "MULTI_TICKER":
+                sb.append("  Companies: ").append(formatList(pred.get("targets"))).append("\n");
+                break;
+            case "SECTOR":
+                sb.append("  Sectors: ").append(formatList(pred.get("targets")));
+                // Also check "sectors" field
+                String additionalSectors = formatList(pred.get("sectors"));
+                if (!additionalSectors.equals("[]") && !additionalSectors.isEmpty()) {
+                    sb.append(", ").append(additionalSectors);
+                }
+                sb.append("\n");
+                // Countries if present
+                String sectorCountries = formatList(pred.get("countries"));
+                if (!sectorCountries.equals("[]") && !sectorCountries.isEmpty()) {
+                    sb.append("  Countries affected: ").append(sectorCountries).append("\n");
+                }
+                break;
+            case "COUNTRY":
+                sb.append("  Countries: ").append(formatList(pred.get("targets")));
+                // Also check "countries" field
+                String additionalCountries = formatList(pred.get("countries"));
+                if (!additionalCountries.equals("[]") && !additionalCountries.isEmpty()) {
+                    sb.append(", ").append(additionalCountries);
+                }
+                sb.append("\n");
+                // Sectors if present
+                String countrySectors = formatList(pred.get("sectors"));
+                if (!countrySectors.equals("[]") && !countrySectors.isEmpty()) {
+                    sb.append("  Sectors affected: ").append(countrySectors).append("\n");
+                }
+                break;
+            default:
+                sb.append("  Targets: ").append(formatList(pred.get("targets"))).append("\n");
+        }
+
+        // Direction and confidence
+        sb.append(String.format("  Direction: %s\n", direction));
+        sb.append(String.format("  Confidence: %d%%\n", confidence));
+        sb.append(String.format("  Time Horizon: %s\n", timeHorizon));
+
+        // Rationale
+        sb.append(String.format("  Rationale: %s\n", rationale));
+
+        // Evidence
+        Object evidenceObj = pred.get("evidence");
+        if (evidenceObj instanceof List && !((List<?>) evidenceObj).isEmpty()) {
+            sb.append("  Evidence:\n");
+            for (Object ev : (List<?>) evidenceObj) {
+                sb.append(String.format("    • %s\n", ev));
+            }
+        }
+
+        sb.append("\n");
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private String formatList(Object obj) {
+        if (obj == null) {
+            return "[]";
+        }
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            if (list.isEmpty()) {
+                return "[]";
+            }
+            return String.join(", ", (List<String>) list);
+        }
+        return String.valueOf(obj);
+    }
+
     private String sanitizeFileName(String title) {
-        // Remove invalid characters and limit length
         String sanitized = title.replaceAll("[^a-zA-Z0-9\\s-]", "")
                 .replaceAll("\\s+", "_")
                 .toLowerCase();
 
-        // Limit to 50 characters
         if (sanitized.length() > 50) {
             sanitized = sanitized.substring(0, 50);
         }

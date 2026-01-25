@@ -4,14 +4,16 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "predictions", indexes = {
-    @Index(name = "idx_prediction_article", columnList = "article_id"),
-    @Index(name = "idx_prediction_company", columnList = "company_id"),
-    @Index(name = "idx_prediction_direction", columnList = "direction"),
-    @Index(name = "idx_prediction_confidence", columnList = "confidence")
+        @Index(name = "idx_prediction_article", columnList = "article_id"),
+        @Index(name = "idx_prediction_company", columnList = "company_id"),
+        @Index(name = "idx_prediction_direction", columnList = "direction"),
+        @Index(name = "idx_prediction_confidence", columnList = "confidence")
 })
 @Getter
 @Setter
@@ -24,23 +26,44 @@ public class Prediction extends BaseEntity {
     @JoinColumn(name = "article_id", nullable = false)
     private Article article;
 
-    // Target of prediction - can be company, sector, or broader scope
     @Enumerated(EnumType.STRING)
     @Column(name = "scope", nullable = false, length = 20)
     private PredictionScope scope;
 
+    // For COMPANY scope - links to specific company
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
-    private Company company; // For COMPANY scope predictions
+    private Company company;
 
-    @Column(name = "target_identifier", length = 100)
-    private String targetIdentifier; // For non-company targets (e.g., "SEMICONDUCTORS", "CRUDE_OIL")
-
-    @ElementCollection
-    @CollectionTable(name = "prediction_targets", joinColumns = @JoinColumn(name = "prediction_id"))
-    @Column(name = "target")
+    // For MULTI_TICKER scope - multiple companies
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "prediction_companies",
+            joinColumns = @JoinColumn(name = "prediction_id"),
+            inverseJoinColumns = @JoinColumn(name = "company_id")
+    )
     @Builder.Default
-    private List<String> targets = new ArrayList<>(); // Multiple tickers for MULTI_TICKER scope
+    private Set<Company> companies = new HashSet<>();
+
+    // For SECTOR scope - links to sector(s)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "prediction_sectors",
+            joinColumns = @JoinColumn(name = "prediction_id"),
+            inverseJoinColumns = @JoinColumn(name = "sector_id")
+    )
+    @Builder.Default
+    private Set<EconomySector> sectors = new HashSet<>();
+
+    // For COUNTRY scope - links to country/countries
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "prediction_countries",
+            joinColumns = @JoinColumn(name = "prediction_id"),
+            inverseJoinColumns = @JoinColumn(name = "country_id")
+    )
+    @Builder.Default
+    private Set<Country> countries = new HashSet<>();
 
     // Prediction details
     @Enumerated(EnumType.STRING)
@@ -66,10 +89,9 @@ public class Prediction extends BaseEntity {
     // Enums
     public enum PredictionScope {
         COMPANY,        // Single company prediction
-        MULTI_TICKER,   // Multiple companies affected
-        SECTOR,         // Industry-wide impact
-        ASSET_CLASS,    // Commodities, bonds, FX, crypto
-        MACRO_THEME     // Geopolitics, regulation, monetary policy
+        MULTI_TICKER,   // Multiple companies affected by same cause
+        SECTOR,         // Industry-wide impact (can include country)
+        COUNTRY         // Country-level economic impact (e.g., trade war)
     }
 
     public enum Direction {

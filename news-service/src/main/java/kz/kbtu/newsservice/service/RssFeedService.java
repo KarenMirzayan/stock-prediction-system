@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jdom2.Element;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
 import java.net.URL;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -23,7 +24,7 @@ public class RssFeedService {
 
         try {
             log.info("Fetching RSS feed from: {}", feedUrl);
-            URL url = new URL(feedUrl);
+            URL url = URI.create(feedUrl).toURL();
             SyndFeedInput input = new SyndFeedInput();
             SyndFeed feed = input.build(new XmlReader(url));
 

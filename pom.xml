@@ -52,12 +52,6 @@
                 <artifactId>jsoup</artifactId>
                 <version>1.22.1</version>
             </dependency>
-
-            <dependency>
-                <groupId>io.hypersistence</groupId>
-                <artifactId>hypersistence-utils-hibernate-63</artifactId>
-                <version>3.14.1</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
     <dependencies>

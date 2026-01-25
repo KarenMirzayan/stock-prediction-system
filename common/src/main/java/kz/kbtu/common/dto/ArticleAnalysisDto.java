@@ -15,10 +15,10 @@ import java.util.List;
 public class ArticleAnalysisDto {
     private String summary;
     private String sentiment;
-    
+
     @Builder.Default
     private List<String> companies = new ArrayList<>();
-    
+
     @Builder.Default
     private List<String> countries = new ArrayList<>();
     
@@ -37,12 +37,18 @@ public class ArticleAnalysisDto {
         
         @Builder.Default
         private List<String> targets = new ArrayList<>();
-        
+
+        @Builder.Default
+        private List<String> countries = new ArrayList<>();
+
+        @Builder.Default
+        private List<String> sectors = new ArrayList<>();
+
         private String direction;
         private String timeHorizon;
         private Integer confidence;
         private String rationale;
-        
+
         @Builder.Default
         private List<String> evidence = new ArrayList<>();
     }

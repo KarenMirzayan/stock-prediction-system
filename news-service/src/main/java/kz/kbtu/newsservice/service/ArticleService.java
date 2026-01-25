@@ -2,10 +2,7 @@ package kz.kbtu.newsservice.service;
 
 import kz.kbtu.common.dto.ArticleAnalysisDto;
 import kz.kbtu.common.entity.*;
-import kz.kbtu.newsservice.repository.ArticleRepository;
-import kz.kbtu.newsservice.repository.CountryRepository;
-import kz.kbtu.newsservice.repository.EconomySectorRepository;
-import kz.kbtu.newsservice.repository.PredictionRepository;
+import kz.kbtu.newsservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,7 +25,6 @@ public class ArticleService {
     @Transactional
     public Article createArticleFromRss(String cnbcId, String title, String url,
                                         String description, LocalDateTime publishedAt) {
-        // Check if article already exists
         if (articleRepository.existsByCnbcId(cnbcId)) {
             log.info("Article {} already exists", cnbcId);
             return articleRepository.findByCnbcId(cnbcId).orElse(null);
@@ -46,7 +42,7 @@ public class ArticleService {
 
         Article saved = articleRepository.save(article);
         log.info("Created article: {} (cnbcId: {})", title, cnbcId);
-        
+
         return saved;
     }
 
@@ -73,7 +69,7 @@ public class ArticleService {
         article.setAnalysisModel(modelName);
         article.setIsAnalyzed(true);
 
-        // Process mentioned companies (get or create them)
+        // Process mentioned companies
         Set<Company> mentionedCompanies = new HashSet<>();
         if (analysis.getCompanies() != null) {
             for (String ticker : analysis.getCompanies()) {
@@ -89,9 +85,7 @@ public class ArticleService {
         Set<Country> mentionedCountries = new HashSet<>();
         if (analysis.getCountries() != null) {
             for (String countryName : analysis.getCountries()) {
-                countryRepository.findByNameIgnoreCase(countryName)
-                        .or(() -> countryRepository.findByCode(countryName.toUpperCase()))
-                        .ifPresent(mentionedCountries::add);
+                findCountry(countryName).ifPresent(mentionedCountries::add);
             }
         }
         article.setMentionedCountries(mentionedCountries);
@@ -99,10 +93,8 @@ public class ArticleService {
         // Process mentioned sectors
         Set<EconomySector> mentionedSectors = new HashSet<>();
         if (analysis.getSectors() != null) {
-            for (String sectorName : analysis.getSectors()) {
-                sectorRepository.findByNameIgnoreCase(sectorName)
-                        .or(() -> sectorRepository.findByCode(sectorName.toUpperCase()))
-                        .ifPresent(mentionedSectors::add);
+            for (String sectorCode : analysis.getSectors()) {
+                findSector(sectorCode).ifPresent(mentionedSectors::add);
             }
         }
         article.setMentionedSectors(mentionedSectors);
@@ -118,8 +110,14 @@ public class ArticleService {
         }
 
         Article saved = articleRepository.save(article);
-        log.info("Processed analysis for article: {} with {} predictions", 
+
+        // Log for debugging
+        log.info("Processed analysis for article: {} with {} predictions",
                 article.getTitle(), article.getPredictions().size());
+        for (Prediction p : article.getPredictions()) {
+            log.info("  Prediction: scope={}, direction={}, confidence={}",
+                    p.getScope(), p.getDirection(), p.getConfidence());
+        }
 
         return saved;
     }
@@ -137,29 +135,112 @@ public class ArticleService {
                     .timeHorizon(timeHorizon)
                     .confidence(dto.getConfidence())
                     .rationale(dto.getRationale())
-                    .evidence(dto.getEvidence() != null ? new ArrayList<>(dto.getEvidence()) : new ArrayList<>())
-                    .targets(dto.getTargets() != null ? new ArrayList<>(dto.getTargets()) : new ArrayList<>());
+                    .evidence(dto.getEvidence() != null ? new ArrayList<>(dto.getEvidence()) : new ArrayList<>());
 
-            // For COMPANY scope, link to the company entity
-            if (scope == Prediction.PredictionScope.COMPANY && dto.getTargets() != null && !dto.getTargets().isEmpty()) {
-                String ticker = dto.getTargets().get(0);
-                Company company = companyService.getOrCreateCompany(ticker);
-                if (company != null) {
-                    builder.company(company);
-                }
-            }
+            // Handle based on scope
+            switch (scope) {
+                case COMPANY:
+                    // Single company - get first target
+                    if (dto.getTargets() != null && !dto.getTargets().isEmpty()) {
+                        String ticker = dto.getTargets().get(0);
+                        Company company = companyService.getOrCreateCompany(ticker);
+                        if (company != null) {
+                            builder.company(company);
+                        }
+                    }
+                    break;
 
-            // For non-company scopes, set target identifier
-            if (scope != Prediction.PredictionScope.COMPANY && dto.getTargets() != null && !dto.getTargets().isEmpty()) {
-                builder.targetIdentifier(String.join(",", dto.getTargets()));
+                case MULTI_TICKER:
+                    // Multiple companies
+                    Set<Company> companies = new HashSet<>();
+                    if (dto.getTargets() != null) {
+                        for (String ticker : dto.getTargets()) {
+                            Company company = companyService.getOrCreateCompany(ticker);
+                            if (company != null) {
+                                companies.add(company);
+                            }
+                        }
+                    }
+                    builder.companies(companies);
+                    break;
+
+                case SECTOR:
+                    // Sector prediction - targets are sector codes
+                    Set<EconomySector> sectors = new HashSet<>();
+                    if (dto.getTargets() != null) {
+                        for (String sectorCode : dto.getTargets()) {
+                            findSector(sectorCode).ifPresent(sectors::add);
+                        }
+                    }
+                    // Also check dto.sectors field
+                    if (dto.getSectors() != null) {
+                        for (String sectorCode : dto.getSectors()) {
+                            findSector(sectorCode).ifPresent(sectors::add);
+                        }
+                    }
+                    builder.sectors(sectors);
+
+                    // Optional: countries affected
+                    Set<Country> sectorCountries = new HashSet<>();
+                    if (dto.getCountries() != null) {
+                        for (String countryName : dto.getCountries()) {
+                            findCountry(countryName).ifPresent(sectorCountries::add);
+                        }
+                    }
+                    builder.countries(sectorCountries);
+                    break;
+
+                case COUNTRY:
+                    // Country prediction - targets are country names
+                    Set<Country> countries = new HashSet<>();
+                    if (dto.getTargets() != null) {
+                        for (String countryName : dto.getTargets()) {
+                            findCountry(countryName).ifPresent(countries::add);
+                        }
+                    }
+                    // Also check dto.countries field
+                    if (dto.getCountries() != null) {
+                        for (String countryName : dto.getCountries()) {
+                            findCountry(countryName).ifPresent(countries::add);
+                        }
+                    }
+                    builder.countries(countries);
+
+                    // Optional: sectors affected
+                    Set<EconomySector> countrySectors = new HashSet<>();
+                    if (dto.getSectors() != null) {
+                        for (String sectorCode : dto.getSectors()) {
+                            findSector(sectorCode).ifPresent(countrySectors::add);
+                        }
+                    }
+                    builder.sectors(countrySectors);
+                    break;
             }
 
             return builder.build();
 
         } catch (Exception e) {
-            log.error("Failed to create prediction from DTO", e);
+            log.error("Failed to create prediction from DTO: {}", dto, e);
             return null;
         }
+    }
+
+    private Optional<Country> findCountry(String nameOrCode) {
+        if (nameOrCode == null || nameOrCode.isEmpty()) {
+            return Optional.empty();
+        }
+        // Try by code first (e.g., "US", "CN")
+        return countryRepository.findByCode(nameOrCode.toUpperCase())
+                .or(() -> countryRepository.findByNameIgnoreCase(nameOrCode));
+    }
+
+    private Optional<EconomySector> findSector(String codeOrName) {
+        if (codeOrName == null || codeOrName.isEmpty()) {
+            return Optional.empty();
+        }
+        // Try by code first (e.g., "TECH", "ENERGY")
+        return sectorRepository.findByCode(codeOrName.toUpperCase())
+                .or(() -> sectorRepository.findByNameIgnoreCase(codeOrName));
     }
 
     private Article.Sentiment parseSentiment(String sentiment) {
@@ -176,6 +257,10 @@ public class ArticleService {
         try {
             return Prediction.PredictionScope.valueOf(scope.toUpperCase());
         } catch (IllegalArgumentException e) {
+            // Handle old values that might still come through
+            if ("ASSET_CLASS".equalsIgnoreCase(scope) || "MACRO_THEME".equalsIgnoreCase(scope)) {
+                return Prediction.PredictionScope.SECTOR; // Default to SECTOR
+            }
             return Prediction.PredictionScope.COMPANY;
         }
     }
