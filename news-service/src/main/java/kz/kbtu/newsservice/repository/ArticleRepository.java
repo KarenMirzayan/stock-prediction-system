@@ -41,4 +41,24 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     @Query("SELECT a.cnbcId FROM Article a WHERE a.cnbcId IN :cnbcIds")
     Set<String> findExistingCnbcIds(@Param("cnbcIds") Collection<String> cnbcIds);
+
+    @Query("SELECT DISTINCT a FROM Article a " +
+           "LEFT JOIN FETCH a.predictions p " +
+           "LEFT JOIN FETCH a.mentionedCompanies " +
+           "LEFT JOIN FETCH a.mentionedSectors " +
+           "LEFT JOIN FETCH a.mentionedCountries " +
+           "LEFT JOIN FETCH p.company " +
+           "LEFT JOIN FETCH p.companies " +
+           "LEFT JOIN FETCH p.sectors " +
+           "WHERE a.id = :id")
+    Optional<Article> findByIdWithAllRelations(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT a FROM Article a " +
+           "JOIN a.mentionedSectors s " +
+           "LEFT JOIN FETCH a.predictions p " +
+           "LEFT JOIN FETCH a.mentionedCompanies " +
+           "LEFT JOIN FETCH p.company " +
+           "WHERE s.code = :sectorCode " +
+           "ORDER BY a.publishedAt DESC")
+    List<Article> findBySectorCode(@Param("sectorCode") String sectorCode);
 }
