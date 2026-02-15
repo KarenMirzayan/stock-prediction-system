@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,23 +38,27 @@ public class NewsProcessingService {
             return;
         }
 
-        log.info("Processing {} articles with LLM analysis...", articles.size());
+        // Batch check existing articles in one query
+        Set<String> existingIds = articleService.findExistingCnbcIds(
+                articles.stream().map(RssArticleDto::getExternalId).collect(Collectors.toList())
+        );
+
+        log.info("Processing {} articles ({} already in DB)...", articles.size(), existingIds.size());
 
         int successCount = 0;
-        int skippedCount = 0;
+        int skippedCount = existingIds.size();
 
         for (int i = 0; i < articles.size(); i++) {
             RssArticleDto rssArticle = articles.get(i);
 
+            if (existingIds.contains(rssArticle.getExternalId())) {
+                log.info("[{}/{}] Already processed, skipping: {}", i + 1, articles.size(), rssArticle.getTitle());
+                continue;
+            }
+
             log.info("[{}/{}] Processing: {}", i + 1, articles.size(), rssArticle.getTitle());
 
             try {
-                // Check if article already exists
-                if (articleService.existsByCnbcId(rssArticle.getExternalId())) {
-                    log.info("Article already processed, skipping: {}", rssArticle.getTitle());
-                    skippedCount++;
-                    continue;
-                }
 
                 // Step 1: Create article record from RSS
                 Article article = articleService.createArticleFromRss(

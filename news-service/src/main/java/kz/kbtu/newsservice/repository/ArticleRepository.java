@@ -7,8 +7,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface ArticleRepository extends JpaRepository<Article, Long> {
@@ -36,4 +38,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     
     @Query("SELECT a FROM Article a JOIN a.mentionedCompanies c WHERE c.ticker = :ticker ORDER BY a.publishedAt DESC")
     List<Article> findByMentionedCompanyTicker(@Param("ticker") String ticker);
+
+    @Query("SELECT a.cnbcId FROM Article a WHERE a.cnbcId IN :cnbcIds")
+    Set<String> findExistingCnbcIds(@Param("cnbcIds") Collection<String> cnbcIds);
 }

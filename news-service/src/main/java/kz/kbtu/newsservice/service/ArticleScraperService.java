@@ -1,14 +1,15 @@
-// src/main/java/kz/kbtu/newsservice/service/ArticleScraperService.java
 package kz.kbtu.newsservice.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -18,7 +19,6 @@ public class ArticleScraperService {
     private static final int TIMEOUT_MS = 10000;
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-    // Patterns to identify non-content text
     private static final Set<String> SKIP_PATTERNS = Set.of(
             "subscribe here",
             "sign up for",
@@ -32,6 +32,17 @@ public class ArticleScraperService {
             "share this article"
     );
 
+    private static final Set<String> PAYWALL_PATTERNS = Set.of(
+            "as a subscriber to the cnbc investing club",
+            "no fiduciary obligation or duty exists",
+            "subject to our terms and conditions and privacy policy",
+            "subscribe to unlock",
+            "this content is for subscribers only",
+            "you must be a subscriber",
+            "sign up to read",
+            "premium content"
+    );
+
     public String scrapeArticle(String url) {
         try {
             log.info("Scraping article from: {}", url);
@@ -42,7 +53,12 @@ public class ArticleScraperService {
                     .followRedirects(true)
                     .get();
 
-            String content = extractCnbcArticle(doc);
+            if (isPaywalled(doc)) {
+                log.warn("Skipping paywalled article: {}", url);
+                return null;
+            }
+
+            String content = extractArticleHtml(doc);
 
             if (content != null && !content.isEmpty()) {
                 log.info("Successfully scraped article ({} characters)", content.length());
@@ -58,102 +74,24 @@ public class ArticleScraperService {
         }
     }
 
-    private String extractCnbcArticle(Document doc) {
-        StringBuilder content = new StringBuilder();
-        Set<String> seenText = new HashSet<>(); // Track duplicates
-
-        // Extract title
-        String title = extractTitle(doc);
-        if (title != null) {
-            content.append("TITLE: ").append(title).append("\n\n");
-        }
-
-        // Extract subtitle/deck if present
-        String subtitle = extractSubtitle(doc);
-        if (subtitle != null && !subtitle.equals(title)) {
-            content.append(subtitle).append("\n\n");
-        }
-
-        // Find the main article body container
+    private String extractArticleHtml(Document doc) {
         Element articleBody = findArticleBody(doc);
 
-        if (articleBody != null) {
-            // Process all content elements in order (p, li, h2, h3, blockquote)
-            Elements contentElements = articleBody.select("p, li, h2, h3, h4, blockquote");
-
-            for (Element element : contentElements) {
-                String text = element.text().trim();
-
-                // Skip if empty, duplicate, or matches skip patterns
-                if (text.isEmpty() || seenText.contains(text) || shouldSkip(text)) {
-                    continue;
-                }
-
-                // Skip very short text that's likely navigation/UI elements
-                // But keep list items that are meaningful even if short
-                if (text.length() < 20 && !element.tagName().equals("li")) {
-                    continue;
-                }
-
-                // Format based on element type
-                String formattedText = formatElement(element, text);
-                if (formattedText != null) {
-                    content.append(formattedText);
-                    seenText.add(text);
-                }
-            }
-        } else {
-            // Fallback: try generic extraction
-            content.append(extractFallback(doc, seenText));
+        if (articleBody == null) {
+            articleBody = extractFallback(doc);
         }
 
-        return content.toString().trim();
-    }
-
-    private String extractTitle(Document doc) {
-        // Try CNBC-specific selectors first
-        String[] titleSelectors = {
-                "h1.ArticleHeader-headline",
-                "h1[data-testid='headline']",
-                "h1.headline",
-                "article h1",
-                "h1"
-        };
-
-        for (String selector : titleSelectors) {
-            Elements titles = doc.select(selector);
-            if (!titles.isEmpty()) {
-                String title = titles.first().text().trim();
-                if (!title.isEmpty()) {
-                    return title;
-                }
-            }
+        if (articleBody == null) {
+            return null;
         }
-        return null;
-    }
 
-    private String extractSubtitle(Document doc) {
-        String[] subtitleSelectors = {
-                ".ArticleHeader-headerContentContainer .deck",
-                "[data-testid='deck']",
-                ".article-deck",
-                ".subtitle"
-        };
+        removeUnwantedElements(articleBody);
+        stripAttributes(articleBody);
 
-        for (String selector : subtitleSelectors) {
-            Elements subtitles = doc.select(selector);
-            if (!subtitles.isEmpty()) {
-                String subtitle = subtitles.first().text().trim();
-                if (!subtitle.isEmpty()) {
-                    return subtitle;
-                }
-            }
-        }
-        return null;
+        return articleBody.html().trim();
     }
 
     private Element findArticleBody(Document doc) {
-        // Try CNBC-specific selectors
         String[] bodySelectors = {
                 "div.ArticleBody-articleBody",
                 "[data-testid='article-body']",
@@ -172,17 +110,60 @@ public class ArticleScraperService {
         return null;
     }
 
+    private Element extractFallback(Document doc) {
+        String[] fallbackSelectors = {"article", "main", "[role='main']", ".content"};
+
+        for (String selector : fallbackSelectors) {
+            Elements elements = doc.select(selector);
+            if (!elements.isEmpty() && !elements.first().select("p").isEmpty()) {
+                return elements.first();
+            }
+        }
+        return null;
+    }
+
+    private void removeUnwantedElements(Element body) {
+        body.select("script, style, nav, footer, header, aside, iframe, noscript, svg, button, form, input").remove();
+
+        for (Element el : body.select("*")) {
+            String text = el.text().toLowerCase().trim();
+            if (!text.isEmpty() && shouldSkip(text)) {
+                el.remove();
+            }
+        }
+    }
+
+    private void stripAttributes(Element root) {
+        for (Element el : root.select("*")) {
+            List<String> attrKeys = new ArrayList<>();
+            for (Attribute attr : el.attributes()) {
+                attrKeys.add(attr.getKey());
+            }
+            for (String key : attrKeys) {
+                el.removeAttr(key);
+            }
+        }
+    }
+
+    private boolean isPaywalled(Document doc) {
+        String text = doc.text().toLowerCase();
+        for (String pattern : PAYWALL_PATTERNS) {
+            if (text.contains(pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean shouldSkip(String text) {
         String lowerText = text.toLowerCase();
 
-        // Check skip patterns
         for (String pattern : SKIP_PATTERNS) {
             if (lowerText.contains(pattern)) {
                 return true;
             }
         }
 
-        // Skip social media handles and promotional text
         if (lowerText.matches(".*@\\w+.*contributed.*") ||
                 lowerText.matches(".*follow.*@.*") ||
                 lowerText.matches(".*\\bvia\\b.*@.*")) {
@@ -190,52 +171,5 @@ public class ArticleScraperService {
         }
 
         return false;
-    }
-
-    private String formatElement(Element element, String text) {
-        String tag = element.tagName();
-
-        switch (tag) {
-            case "h2":
-            case "h3":
-            case "h4":
-                // Format headers
-                return "\n## " + text + "\n\n";
-
-            case "li":
-                // Format list items - check if part of numbered or bullet list
-                Element parent = element.parent();
-                if (parent != null && parent.tagName().equals("ol")) {
-                    int index = element.elementSiblingIndex() + 1;
-                    return index + ". " + text + "\n";
-                } else {
-                    return "• " + text + "\n";
-                }
-
-            case "blockquote":
-                return "> " + text + "\n\n";
-
-            case "p":
-            default:
-                // Regular paragraph - add proper spacing
-                return text + "\n\n";
-        }
-    }
-
-    private String extractFallback(Document doc, Set<String> seenText) {
-        StringBuilder content = new StringBuilder();
-
-        // Try to get any paragraph content
-        Elements paragraphs = doc.select("article p, main p, .content p");
-
-        for (Element p : paragraphs) {
-            String text = p.text().trim();
-            if (text.length() >= 30 && !seenText.contains(text) && !shouldSkip(text)) {
-                content.append(text).append("\n\n");
-                seenText.add(text);
-            }
-        }
-
-        return content.toString();
     }
 }

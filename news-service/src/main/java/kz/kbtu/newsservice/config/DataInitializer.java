@@ -36,11 +36,10 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Initializing economy sectors...");
 
         List<EconomySector> sectors = List.of(
-            // Primary Sectors (GICS-inspired)
             EconomySector.builder()
                 .code("TECH")
                 .name("Technology")
-                .description("Information technology, software, hardware, semiconductors, and IT services")
+                .description("Software, hardware, semiconductors, AI, cloud, and IT services")
                 .build(),
             EconomySector.builder()
                 .code("HEALTHCARE")
@@ -50,27 +49,22 @@ public class DataInitializer implements CommandLineRunner {
             EconomySector.builder()
                 .code("FINANCE")
                 .name("Financial Services")
-                .description("Banks, insurance, asset management, and financial technology")
+                .description("Banks, insurance, asset management, fintech, and crypto")
                 .build(),
             EconomySector.builder()
-                .code("CONSUMER_DISC")
-                .name("Consumer Discretionary")
-                .description("Automobiles, retail, apparel, hotels, restaurants, and leisure")
-                .build(),
-            EconomySector.builder()
-                .code("CONSUMER_STAPLES")
-                .name("Consumer Staples")
-                .description("Food, beverages, tobacco, and household products")
+                .code("CONSUMER")
+                .name("Consumer")
+                .description("Retail, e-commerce, food, beverages, apparel, media, and entertainment")
                 .build(),
             EconomySector.builder()
                 .code("ENERGY")
                 .name("Energy")
-                .description("Oil, gas, coal, and renewable energy companies")
+                .description("Oil, gas, coal, renewables, clean energy, and utilities")
                 .build(),
             EconomySector.builder()
                 .code("INDUSTRIALS")
                 .name("Industrials")
-                .description("Aerospace, defense, machinery, construction, and transportation")
+                .description("Aerospace, defense, machinery, construction, automotive, and transportation")
                 .build(),
             EconomySector.builder()
                 .code("MATERIALS")
@@ -81,78 +75,6 @@ public class DataInitializer implements CommandLineRunner {
                 .code("REAL_ESTATE")
                 .name("Real Estate")
                 .description("REITs, real estate development, and property management")
-                .build(),
-            EconomySector.builder()
-                .code("UTILITIES")
-                .name("Utilities")
-                .description("Electric, gas, water utilities, and independent power producers")
-                .build(),
-            EconomySector.builder()
-                .code("TELECOM")
-                .name("Telecommunications")
-                .description("Wireless, wireline, and telecommunications services")
-                .build(),
-
-            // Sub-sectors for more granular classification
-            EconomySector.builder()
-                .code("SEMICONDUCTORS")
-                .name("Semiconductors")
-                .description("Semiconductor manufacturing, design, and equipment")
-                .build(),
-            EconomySector.builder()
-                .code("SOFTWARE")
-                .name("Software")
-                .description("Enterprise software, cloud computing, and SaaS")
-                .build(),
-            EconomySector.builder()
-                .code("E_COMMERCE")
-                .name("E-Commerce")
-                .description("Online retail, marketplaces, and digital commerce")
-                .build(),
-            EconomySector.builder()
-                .code("SOCIAL_MEDIA")
-                .name("Social Media")
-                .description("Social networking platforms and digital advertising")
-                .build(),
-            EconomySector.builder()
-                .code("AUTOMOTIVE")
-                .name("Automotive")
-                .description("Vehicle manufacturers, auto parts, and electric vehicles")
-                .build(),
-            EconomySector.builder()
-                .code("AEROSPACE")
-                .name("Aerospace & Defense")
-                .description("Aircraft, defense systems, and space technology")
-                .build(),
-            EconomySector.builder()
-                .code("BIOTECH")
-                .name("Biotechnology")
-                .description("Biotechnology research, drug development, and genomics")
-                .build(),
-            EconomySector.builder()
-                .code("FINTECH")
-                .name("Financial Technology")
-                .description("Digital payments, blockchain, and financial software")
-                .build(),
-            EconomySector.builder()
-                .code("AI_ML")
-                .name("Artificial Intelligence")
-                .description("AI, machine learning, and data analytics companies")
-                .build(),
-            EconomySector.builder()
-                .code("CLEAN_ENERGY")
-                .name("Clean Energy")
-                .description("Solar, wind, and other renewable energy technologies")
-                .build(),
-            EconomySector.builder()
-                .code("MEDIA")
-                .name("Media & Entertainment")
-                .description("Streaming, broadcasting, film, and gaming")
-                .build(),
-            EconomySector.builder()
-                .code("CRYPTO")
-                .name("Cryptocurrency")
-                .description("Cryptocurrency exchanges, blockchain, and digital assets")
                 .build()
         );
 
@@ -188,7 +110,8 @@ public class DataInitializer implements CommandLineRunner {
             Country.builder().code("IL").name("Israel").region("Middle East").build(),
             Country.builder().code("SA").name("Saudi Arabia").region("Middle East").build(),
             Country.builder().code("AE").name("United Arab Emirates").region("Middle East").build(),
-            Country.builder().code("BR").name("Brazil").region("South America").build()
+            Country.builder().code("BR").name("Brazil").region("South America").build(),
+            Country.builder().code("KZ").name("Kazakhstan").region("Asia").build()
         );
 
         countryRepository.saveAll(countries);

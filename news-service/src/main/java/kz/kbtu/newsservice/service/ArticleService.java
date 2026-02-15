@@ -302,4 +302,8 @@ public class ArticleService {
     public List<Article> findRecentArticles(int days) {
         return articleRepository.findRecentArticles(LocalDateTime.now().minusDays(days));
     }
+
+    public Set<String> findExistingCnbcIds(Collection<String> cnbcIds) {
+        return articleRepository.findExistingCnbcIds(cnbcIds);
+    }
 }
