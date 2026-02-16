@@ -175,7 +175,7 @@ public class CompanyService {
                     .build();
 
         } catch (Exception e) {
-            log.error("Failed to parse company info response for {}", ticker, e);
+            log.error("Failed to parse company info response for {}, response: {}", ticker, jsonResponse,e);
             return null;
         }
     }
