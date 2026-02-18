@@ -3,6 +3,7 @@ package kz.kbtu.newsservice.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kz.kbtu.common.dto.ArticleAnalysisDto;
+import kz.kbtu.common.dto.MarketEventDto;
 import kz.kbtu.common.entity.EconomySector;
 import kz.kbtu.newsservice.repository.EconomySectorRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -169,7 +171,7 @@ public class OllamaAnalysisService {
                 "stream", false,
                 "options", Map.of(
                         "temperature", 0.1,
-                        "num_predict", 1500,
+                        "num_predict", 6000,
                         "top_p", 0.9
                 )
         );
@@ -255,6 +257,117 @@ public class OllamaAnalysisService {
             node.forEach(item -> result.add(item.asText()));
         }
         return result;
+    }
+
+    /**
+     * Extracts scheduled calendar events from a news article using a focused LLM prompt.
+     * Returns an empty list if no qualifying events are found or parsing fails.
+     *
+     * @param title          article headline
+     * @param content        full article text
+     * @param companyTickers map of company name → ticker for companies already resolved in this article
+     * @param articleDate    publication date of the article (for resolving relative dates)
+     */
+    public List<MarketEventDto> extractEvents(String title, String content,
+                                              Map<String, String> companyTickers,
+                                              LocalDate articleDate) {
+        String prompt = buildEventExtractionPrompt(title, content, companyTickers, articleDate);
+        try {
+            String response = generate(prompt);
+            return parseEventResponse(response);
+        } catch (Exception e) {
+            log.warn("Failed to extract events from article '{}': {}", title, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String buildEventExtractionPrompt(String title, String content,
+                                               Map<String, String> companyTickers,
+                                               LocalDate articleDate) {
+        String today = LocalDate.now().toString();
+        String articleDateStr = articleDate != null ? articleDate.toString() : today;
+
+        StringBuilder tickerLines = new StringBuilder();
+        if (companyTickers.isEmpty()) {
+            tickerLines.append("(none identified)");
+        } else {
+            companyTickers.forEach((name, ticker) ->
+                    tickerLines.append("  ").append(name).append(" → ").append(ticker).append("\n"));
+        }
+
+        return String.format("""
+                You are extracting scheduled financial calendar events from a news article.
+
+                TODAY: %s
+                ARTICLE DATE: %s
+
+                COMPANIES IN THIS ARTICLE (Name → Ticker):
+                %s
+
+                EXTRACT ONLY these event types when a specific future date is mentioned:
+                - EARNINGS: Quarterly/annual earnings reports
+                - DIVIDEND: Dividend payment or ex-dividend dates
+                - CONFERENCE: Investor days, analyst days, shareholder meetings
+                - ECONOMIC: Central bank meetings, major data releases (CPI, GDP, NFP, PMI, FOMC, etc.)
+
+                RULES:
+                - Only include events dated AFTER today (%s)
+                - Resolve relative dates ("next Tuesday", "this Friday") using the ARTICLE DATE
+                - Skip events with no clear specific date
+                - relevance: HIGH = major market-moving, MEDIUM = sector-relevant, LOW = minor
+
+                Respond ONLY with a JSON array. Return [] if nothing qualifies.
+
+                [
+                  {
+                    "title": "Short descriptive name",
+                    "date": "YYYY-MM-DD",
+                    "time": "H:MM AM/PM ET or TBD",
+                    "type": "EARNINGS | ECONOMIC | DIVIDEND | CONFERENCE",
+                    "relevance": "HIGH | MEDIUM | LOW",
+                    "companyTicker": "TICKER or null",
+                    "sector": "Technology | Finance | Energy | Healthcare | Consumer | Industrial | etc"
+                  }
+                ]
+
+                ARTICLE TITLE: %s
+                ARTICLE: %s
+                """,
+                today, articleDateStr, tickerLines.toString(), today, title, content);
+    }
+
+    private List<MarketEventDto> parseEventResponse(String jsonResponse) {
+        try {
+            String cleaned = cleanJsonResponse(jsonResponse);
+            JsonNode root = objectMapper.readTree(cleaned);
+
+            List<MarketEventDto> events = new ArrayList<>();
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    String ticker = node.path("companyTicker").isNull() ? null
+                            : node.path("companyTicker").asText(null);
+
+                    MarketEventDto dto = MarketEventDto.builder()
+                            .title(node.path("title").asText(null))
+                            .date(node.path("date").asText(null))
+                            .time(node.path("time").asText("TBD"))
+                            .type(node.path("type").asText("ECONOMIC"))
+                            .relevance(node.path("relevance").asText("MEDIUM"))
+                            .companyTicker("null".equalsIgnoreCase(ticker) ? null : ticker)
+                            .sector(node.path("sector").asText(null))
+                            .build();
+
+                    if (dto.getTitle() != null && dto.getDate() != null) {
+                        events.add(dto);
+                    }
+                }
+            }
+            log.info("Extracted {} calendar events from article", events.size());
+            return events;
+        } catch (Exception e) {
+            log.warn("Failed to parse event extraction response: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     public boolean isAvailable() {

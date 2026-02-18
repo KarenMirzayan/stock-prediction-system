@@ -144,9 +144,11 @@ public class ArticleService {
                     if (dto.getTargets() != null && !dto.getTargets().isEmpty()) {
                         String companyName = dto.getTargets().get(0);
                         Company company = companyService.getOrCreateCompany(companyName);
-                        if (company != null) {
-                            builder.company(company);
+                        if (company == null) {
+                            log.info("Skipping COMPANY prediction — '{}' could not be verified as public", companyName);
+                            return null;
                         }
+                        builder.company(company);
                     }
                     break;
 
@@ -160,6 +162,10 @@ public class ArticleService {
                                 companies.add(company);
                             }
                         }
+                    }
+                    if (companies.isEmpty()) {
+                        log.info("Skipping MULTI_TICKER prediction — none of the targets could be verified as public");
+                        return null;
                     }
                     builder.companies(companies);
                     break;

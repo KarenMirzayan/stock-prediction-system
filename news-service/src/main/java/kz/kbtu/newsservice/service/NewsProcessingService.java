@@ -1,13 +1,17 @@
 package kz.kbtu.newsservice.service;
 
 import kz.kbtu.common.dto.ArticleAnalysisDto;
+import kz.kbtu.common.dto.MarketEventDto;
 import kz.kbtu.common.dto.RssArticleDto;
 import kz.kbtu.common.entity.Article;
+import kz.kbtu.common.entity.Company;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -21,6 +25,7 @@ public class NewsProcessingService {
     private final FileStorageService fileStorageService;
     private final OllamaAnalysisService ollamaService;
     private final ArticleService articleService;
+    private final MarketEventService marketEventService;
 
     public void processRssFeed(String feedUrl) {
         log.info("Starting RSS feed processing with LLM analysis and database persistence...");
@@ -94,7 +99,23 @@ public class NewsProcessingService {
                             ollamaService.getModelName()
                     );
 
-                    // Step 5: Also save to file for backup/review
+                    // Step 5: Extract and save calendar events
+                    Map<String, String> tickerMap = article.getMentionedCompanies().stream()
+                            .collect(Collectors.toMap(
+                                    Company::getName,
+                                    Company::getTicker,
+                                    (a, b) -> a
+                            ));
+                    LocalDate articleDate = rssArticle.getPublishedAt() != null
+                            ? rssArticle.getPublishedAt().toLocalDate()
+                            : LocalDate.now();
+                    List<MarketEventDto> events = ollamaService.extractEvents(
+                            rssArticle.getTitle(), content, tickerMap, articleDate);
+                    if (!events.isEmpty()) {
+                        marketEventService.saveEvents(events, article);
+                    }
+
+                    // Step 7: Also save to file for backup/review
                     fileStorageService.saveArticleWithAnalysis(
                             rssArticle.getTitle(),
                             rssArticle.getUrl(),

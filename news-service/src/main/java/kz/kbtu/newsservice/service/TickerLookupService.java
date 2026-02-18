@@ -24,6 +24,23 @@ public class TickerLookupService {
             "Euronext", "SIX", "JSE", "SGX", "SET", "BM"
     );
 
+    // Words stripped from both sides during name comparison (legal/structural, not brand identity)
+    private static final Set<String> BUSINESS_SUFFIXES = Set.of(
+            "inc", "corp", "corporation", "ltd", "limited", "co", "llc", "lp", "plc",
+            "sa", "ag", "nv", "se", "ab", "gmbh", "bv", "sas", "spa", "oy",
+            "holding", "holdings", "group", "international", "global",
+            "etp", "etf", "token", "usd", "eur", "sek", "com", "the"
+    );
+
+    // Extra words in the result name (beyond the query) that are still acceptable
+    // These describe corporate structure/domain but don't identify a different company
+    private static final Set<String> ALLOWED_NAME_EXTENSIONS = Set.of(
+            "platforms", "technologies", "technology", "tech",
+            "solutions", "services", "systems", "industries",
+            "digital", "labs", "ventures", "capital", "financial",
+            "bancorp", "bancshares", "semiconductor", "semiconductors"
+    );
+
     private static final int MAX_RETRIES = 3;
 
     public TickerLookupService(
@@ -101,22 +118,95 @@ public class TickerLookupService {
                 }
 
                 String exchange = item.path("exchange").asText();
-                if (isMajorExchange(exchange)) {
-                    String ticker = item.path("symbol").asText();
-                    String name = item.path("instrument_name").asText();
-                    String country = item.path("country").asText();
-                    log.info("Resolved '{}' → {} on {} ({})", companyName, ticker, exchange, name);
-                    return new TickerResult(ticker, exchange, name, country);
+                if (!isMajorExchange(exchange)) {
+                    continue;
                 }
+
+                String ticker = item.path("symbol").asText();
+                String name = item.path("instrument_name").asText();
+                String country = item.path("country").asText();
+
+                if (!isNameSimilar(companyName, name)) {
+                    log.info("Skipping '{}' ({}) — name too different from query '{}'", name, ticker, companyName);
+                    continue;
+                }
+
+                log.info("Resolved '{}' → {} on {} ({})", companyName, ticker, exchange, name);
+                return new TickerResult(ticker, exchange, name, country);
             }
 
-            log.info("No major exchange listing found for '{}'", companyName);
+            log.info("No verified public company match found for '{}'", companyName);
             return null;
 
         } catch (Exception e) {
             log.error("Failed to parse Twelve Data response for '{}'", companyName, e);
             return null;
         }
+    }
+
+    /**
+     * Checks whether a Twelve Data instrument name is close enough to the queried company name.
+     *
+     * Both names are normalized (lowercased, punctuation removed, business suffixes stripped).
+     * The normalized result must start with the normalized query words, and any extra words
+     * in the result must be in the allowed generic extensions list.
+     *
+     * Examples:
+     *   "Apple"   → "Apple Inc"              → normalize both → "apple" == "apple"         → true
+     *   "Meta"    → "Meta Platforms Inc"      → "meta platforms" starts with "meta",
+     *                                            extra "platforms" in allowed list          → true
+     *   "Render"  → "Render Cube S.A."        → "render cube" starts with "render",
+     *                                            extra "cube" NOT in allowed list           → false
+     *   "Render"  → "21Shares Render ETP"     → "21shares render" doesn't start with
+     *                                            "render"                                   → false
+     */
+    boolean isNameSimilar(String query, String resultName) {
+        String normQuery = normalizeName(query);
+        String normResult = normalizeName(resultName);
+
+        if (normQuery.isEmpty() || normResult.isEmpty()) return false;
+        if (normResult.equals(normQuery)) return true;
+
+        String[] queryWords = normQuery.split("\\s+");
+        String[] resultWords = normResult.split("\\s+");
+
+        if (resultWords.length < queryWords.length) return false;
+
+        // Result must start with the exact query words
+        for (int i = 0; i < queryWords.length; i++) {
+            if (!resultWords[i].equals(queryWords[i])) return false;
+        }
+
+        // Any extra words in the result must be in the allowed generic extensions
+        for (int i = queryWords.length; i < resultWords.length; i++) {
+            if (!ALLOWED_NAME_EXTENSIONS.contains(resultWords[i])) {
+                log.info("Name mismatch: '{}' vs '{}' — extra word '{}' not allowed",
+                        query, resultName, resultWords[i]);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Normalizes a company name for comparison:
+     * lowercases, removes punctuation, strips business/legal suffixes.
+     */
+    private String normalizeName(String name) {
+        if (name == null) return "";
+        String lower = name.toLowerCase();
+        lower = lower.replaceAll("\\.com\\b", ""); // strip .com domains before splitting
+        lower = lower.replaceAll("[^a-z0-9 ]", " "); // remove punctuation
+        String[] words = lower.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (!word.isEmpty() && !BUSINESS_SUFFIXES.contains(word)) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(word);
+            }
+        }
+        return sb.toString().trim();
     }
 
     private boolean isMajorExchange(String exchange) {
