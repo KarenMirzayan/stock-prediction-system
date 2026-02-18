@@ -69,11 +69,11 @@ public class ArticleService {
         article.setAnalysisModel(modelName);
         article.setIsAnalyzed(true);
 
-        // Process mentioned companies
+        // Process mentioned companies (LLM now returns company names, not tickers)
         Set<Company> mentionedCompanies = new HashSet<>();
         if (analysis.getCompanies() != null) {
-            for (String ticker : analysis.getCompanies()) {
-                Company company = companyService.getOrCreateCompany(ticker);
+            for (String companyName : analysis.getCompanies()) {
+                Company company = companyService.getOrCreateCompany(companyName);
                 if (company != null) {
                     mentionedCompanies.add(company);
                 }
@@ -140,10 +140,10 @@ public class ArticleService {
             // Handle based on scope
             switch (scope) {
                 case COMPANY:
-                    // Single company - get first target
+                    // Single company - get first target (now a company name, not ticker)
                     if (dto.getTargets() != null && !dto.getTargets().isEmpty()) {
-                        String ticker = dto.getTargets().get(0);
-                        Company company = companyService.getOrCreateCompany(ticker);
+                        String companyName = dto.getTargets().get(0);
+                        Company company = companyService.getOrCreateCompany(companyName);
                         if (company != null) {
                             builder.company(company);
                         }
@@ -151,11 +151,11 @@ public class ArticleService {
                     break;
 
                 case MULTI_TICKER:
-                    // Multiple companies
+                    // Multiple companies (targets are now company names)
                     Set<Company> companies = new HashSet<>();
                     if (dto.getTargets() != null) {
-                        for (String ticker : dto.getTargets()) {
-                            Company company = companyService.getOrCreateCompany(ticker);
+                        for (String companyName : dto.getTargets()) {
+                            Company company = companyService.getOrCreateCompany(companyName);
                             if (company != null) {
                                 companies.add(company);
                             }

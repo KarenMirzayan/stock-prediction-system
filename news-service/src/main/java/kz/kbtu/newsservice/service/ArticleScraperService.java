@@ -2,14 +2,11 @@ package kz.kbtu.newsservice.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 
 @Service
@@ -29,7 +26,19 @@ public class ArticleScraperService {
             "advertisement",
             "sponsored content",
             "follow us on",
-            "share this article"
+            "share this article",
+            "watch now",
+            "squawk box",
+            "squawk on the street",
+            "closing bell",
+            "power lunch",
+            "fast money",
+            "mad money"
+    );
+
+    private static final Set<String> NOISE_PATTERNS = Set.of(
+            "video",
+            "watch now"
     );
 
     private static final Set<String> PAYWALL_PATTERNS = Set.of(
@@ -86,9 +95,21 @@ public class ArticleScraperService {
         }
 
         removeUnwantedElements(articleBody);
-        stripAttributes(articleBody);
 
-        return articleBody.html().trim();
+        // Extract only meaningful paragraph text instead of raw HTML
+        StringBuilder sb = new StringBuilder();
+        for (Element p : articleBody.select("p")) {
+            String text = p.text().trim();
+            if (text.isEmpty() || text.length() < 20) {
+                continue;
+            }
+            if (shouldSkip(text) || isNoiseLine(text)) {
+                continue;
+            }
+            sb.append(text).append("\n\n");
+        }
+
+        return sb.toString().trim();
     }
 
     private Element findArticleBody(Document doc) {
@@ -124,23 +145,14 @@ public class ArticleScraperService {
 
     private void removeUnwantedElements(Element body) {
         body.select("script, style, nav, footer, header, aside, iframe, noscript, svg, button, form, input").remove();
+        body.select("figure, figcaption, picture, video, audio, source").remove();
+        body.select("[data-module='video'], [data-module='clip'], [class*='video'], [class*='Video']").remove();
+        body.select("img").remove();
 
         for (Element el : body.select("*")) {
             String text = el.text().toLowerCase().trim();
             if (!text.isEmpty() && shouldSkip(text)) {
                 el.remove();
-            }
-        }
-    }
-
-    private void stripAttributes(Element root) {
-        for (Element el : root.select("*")) {
-            List<String> attrKeys = new ArrayList<>();
-            for (Attribute attr : el.attributes()) {
-                attrKeys.add(attr.getKey());
-            }
-            for (String key : attrKeys) {
-                el.removeAttr(key);
             }
         }
     }
@@ -151,6 +163,20 @@ public class ArticleScraperService {
             if (text.contains(pattern)) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    private boolean isNoiseLine(String text) {
+        String lower = text.toLowerCase().trim();
+        for (String noise : NOISE_PATTERNS) {
+            if (lower.equals(noise)) {
+                return true;
+            }
+        }
+        // Skip lines that look like video timestamps (e.g., "04:57" or "4:57")
+        if (lower.matches("^\\d{1,2}:\\d{2}$")) {
+            return true;
         }
         return false;
     }

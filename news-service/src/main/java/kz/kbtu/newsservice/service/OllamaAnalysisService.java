@@ -81,11 +81,11 @@ public class OllamaAnalysisService {
     Ask yourself: "Who is DIRECTLY affected by this news?"
 
     1. Is a SPECIFIC COMPANY the main subject?
-       → Use scope: "COMPANY", targets: ["TICKER"]
+       → Use scope: "COMPANY", targets: ["Full Company Name"]
        → News about earnings, layoffs, products, lawsuits, management of ONE company = COMPANY scope
-   
+
     2. Are MULTIPLE SPECIFIC COMPANIES directly named and affected?
-       → Use scope: "MULTI_TICKER", targets: ["TICKER1", "TICKER2", ...]
+       → Use scope: "MULTI_TICKER", targets: ["Company Name 1", "Company Name 2", ...]
    
     3. Is an ENTIRE INDUSTRY affected (not just one company)?
        → Use scope: "SECTOR", targets: ["SECTOR_CODE"]
@@ -128,7 +128,7 @@ public class OllamaAnalysisService {
 
     {
       "summary": "2-4 sentence factual summary",
-      "companies": ["TICKER1", "TICKER2"],
+      "companies": ["Apple Inc", "Microsoft Corporation"],
       "countries": ["Country1"],
       "sectors": ["SECTOR_CODE1"],
       "sentiment": "POSITIVE | NEGATIVE | NEUTRAL | MIXED",
@@ -149,12 +149,12 @@ public class OllamaAnalysisService {
 
     === FIELD RULES ===
     
-    - companies: Stock tickers mentioned in the article. Always uppercase.
+    - companies: Full official company names mentioned in the article. Do NOT return stock tickers.
     - countries: Countries mentioned by name
     - sectors: Use CODES from the available sector list above, not full names
-    - predictions.targets: 
-      - COMPANY scope → single ticker
-      - MULTI_TICKER scope → multiple tickers
+    - predictions.targets:
+      - COMPANY scope → single full company name (e.g. "Apple Inc", NOT "AAPL")
+      - MULTI_TICKER scope → multiple full company names
       - SECTOR scope → sector codes from available list
       - COUNTRY scope → country names
     - predictions.countries: Only for SECTOR scope if specific countries affected

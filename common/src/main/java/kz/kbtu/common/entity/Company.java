@@ -24,8 +24,23 @@ public class Company extends BaseEntity {
     @Column(name = "ticker", nullable = false, length = 10, unique = true)
     private String ticker; // Stock ticker symbol (e.g., "AAPL", "GOOGL", "TSLA")
 
-    @Column(name = "description", length = 1000)
-    private String description; // 3-6 sentence description from LLM
+    @Column(name = "exchange", length = 20)
+    private String exchange; // Exchange where the stock is listed (e.g., "NASDAQ", "NYSE")
+
+    @Column(name = "description", length = 2000)
+    private String description; // Company description from Wikipedia
+
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
+    @Column(name = "website_url", length = 500)
+    private String websiteUrl;
+
+    @Column(name = "market_cap")
+    private Double marketCap; // In millions, from Finnhub
+
+    @Column(name = "ipo_date", length = 10)
+    private String ipoDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "country_id")

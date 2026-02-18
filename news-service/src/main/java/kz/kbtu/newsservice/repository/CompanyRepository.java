@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface CompanyRepository extends JpaRepository<Company, Long> {
     
     Optional<Company> findByTicker(String ticker);
+
+    Optional<Company> findByNameIgnoreCase(String name);
     
     Optional<Company> findByTickerIgnoreCase(String ticker);
     

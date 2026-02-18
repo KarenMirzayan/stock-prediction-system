@@ -14,7 +14,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: false
     properties:
       hibernate:
@@ -33,3 +33,10 @@ logging:
 ollama:
   url: ${OLLAMA_URL}
   model: ${OLLAMA_MODEL}
+
+twelvedata:
+  api-key: ${TWELVE_DATA_API_KEY:demo}
+  base-url: https://api.twelvedata.com
+
+finnhub:
+  api-key: ${FINNHUB_API_KEY:demo}

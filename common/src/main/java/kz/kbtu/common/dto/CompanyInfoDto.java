@@ -13,8 +13,13 @@ import java.util.List;
 @AllArgsConstructor
 public class CompanyInfoDto {
     private String ticker;
+    private String exchange;
     private String name;
     private String description;
+    private String logoUrl;
+    private String websiteUrl;
+    private Double marketCap;
+    private String ipoDate;
     private String countryCode;
     private String countryName;
     private List<String> sectorCodes;
