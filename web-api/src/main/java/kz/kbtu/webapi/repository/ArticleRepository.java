@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -31,4 +32,9 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     @Query("SELECT a FROM Article a WHERE a.isAnalyzed = true AND a.sentiment = :sentiment ORDER BY a.publishedAt DESC")
     Page<Article> findBySentiment(@Param("sentiment") Article.Sentiment sentiment, Pageable pageable);
+
+    @Query("SELECT DISTINCT a FROM Article a LEFT JOIN FETCH a.mentionedSectors " +
+           "WHERE a.isAnalyzed = true AND a.content IS NOT NULL AND a.summary IS NOT NULL " +
+           "ORDER BY a.publishedAt DESC")
+    List<Article> findSimulationArticles();
 }
