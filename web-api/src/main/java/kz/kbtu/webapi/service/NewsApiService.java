@@ -111,27 +111,47 @@ public class NewsApiService {
                     if (p.getCompany() != null) {
                         String ticker = p.getCompany().getTicker();
                         badgeMap.putIfAbsent(ticker, CompanyPredictionDto.builder()
-                                .ticker(ticker).direction(direction).build());
+                                .ticker(ticker).direction(direction)
+                                .rationale(p.getRationale())
+                                .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
+                                .confidence(p.getConfidence())
+                                .evidence(p.getEvidence())
+                                .build());
                     }
                 }
                 case MULTI_TICKER -> {
                     for (Company c : p.getCompanies()) {
                         badgeMap.putIfAbsent(c.getTicker(), CompanyPredictionDto.builder()
-                                .ticker(c.getTicker()).direction(direction).build());
+                                .ticker(c.getTicker()).direction(direction)
+                                .rationale(p.getRationale())
+                                .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
+                                .confidence(p.getConfidence())
+                                .evidence(p.getEvidence())
+                                .build());
                     }
                 }
                 case SECTOR -> {
                     for (EconomySector sector : p.getSectors()) {
                         String label = buildSectorLabel(sector.getCode(), p.getCountries());
                         badgeMap.putIfAbsent(label, CompanyPredictionDto.builder()
-                                .ticker(label).direction(direction).build());
+                                .ticker(label).direction(direction)
+                                .rationale(p.getRationale())
+                                .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
+                                .confidence(p.getConfidence())
+                                .evidence(p.getEvidence())
+                                .build());
                     }
                 }
                 case COUNTRY -> {
                     for (Country country : p.getCountries()) {
                         String label = buildCountryLabel(country.getCode(), p.getSectors());
                         badgeMap.putIfAbsent(label, CompanyPredictionDto.builder()
-                                .ticker(label).direction(direction).build());
+                                .ticker(label).direction(direction)
+                                .rationale(p.getRationale())
+                                .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
+                                .confidence(p.getConfidence())
+                                .evidence(p.getEvidence())
+                                .build());
                     }
                 }
             }

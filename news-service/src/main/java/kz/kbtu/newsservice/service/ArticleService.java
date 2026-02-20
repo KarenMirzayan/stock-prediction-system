@@ -186,12 +186,15 @@ public class ArticleService {
                     }
                     builder.sectors(sectors);
 
-                    // Optional: countries affected
+                    // Countries affected — fall back to article-level countries if LLM omitted them
                     Set<Country> sectorCountries = new HashSet<>();
                     if (dto.getCountries() != null) {
                         for (String countryName : dto.getCountries()) {
                             findCountry(countryName).ifPresent(sectorCountries::add);
                         }
+                    }
+                    if (sectorCountries.isEmpty()) {
+                        sectorCountries.addAll(article.getMentionedCountries());
                     }
                     builder.countries(sectorCountries);
                     break;

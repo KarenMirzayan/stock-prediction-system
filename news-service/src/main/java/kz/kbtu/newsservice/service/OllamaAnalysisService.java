@@ -59,7 +59,8 @@ public class OllamaAnalysisService {
         List<EconomySector> sectors = sectorRepository.findAll();
 
         return sectors.stream()
-                .map(s -> s.getCode() + " (" + s.getName() + ")")
+                .map(s -> s.getCode() + " (" + s.getName()
+                        + (s.getDescription() != null ? ": " + s.getDescription() : "") + ")")
                 .collect(Collectors.joining(", "));
     }
 
@@ -159,7 +160,7 @@ public class OllamaAnalysisService {
       - MULTI_TICKER scope → multiple full company names
       - SECTOR scope → sector codes from available list
       - COUNTRY scope → country names
-    - predictions.countries: Only for SECTOR scope if specific countries affected
+    - predictions.countries: REQUIRED for SECTOR scope. Always list the countries where this sector is affected. Never leave empty for SECTOR scope.
     - predictions.sectors: Only for COUNTRY scope if specific sectors affected
     """, title, content, availableSectors);
     }
