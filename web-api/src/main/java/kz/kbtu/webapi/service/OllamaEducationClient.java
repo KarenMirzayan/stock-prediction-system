@@ -48,7 +48,7 @@ public class OllamaEducationClient {
                     "model", model,
                     "prompt", prompt,
                     "stream", false,
-                    "options", Map.of("temperature", 0.0, "num_predict", 500)
+                    "options", Map.of("temperature", 0.0, "num_predict", 3000)
             );
 
             @SuppressWarnings("unchecked")
@@ -68,15 +68,22 @@ public class OllamaEducationClient {
     }
 
     private int parseScore(String raw) {
-        // Strip <think>...</think> blocks produced by reasoning models (e.g. deepseek-r1)
-        String cleaned = raw.replaceAll("(?s)<think>.*?</think>", "").trim();
+        // Strip complete <think>...</think> blocks, then any unclosed <think>... tail
+        // (unclosed = truncated response that never emitted </think>)
+        String cleaned = raw
+                .replaceAll("(?s)<think>.*?</think>", "")
+                .replaceAll("(?s)<think>.*$", "")
+                .trim();
 
-        // Extract the first 1-3 digit number from the response
+        // Take the last number ≤ 100 — models often say "score is X" at the end
         Matcher m = Pattern.compile("\\b([0-9]{1,3})\\b").matcher(cleaned);
-        if (m.find()) {
-            int score = Integer.parseInt(m.group(1));
-            return Math.min(100, Math.max(0, score));
+        int score = -1;
+        while (m.find()) {
+            int candidate = Integer.parseInt(m.group(1));
+            if (candidate <= 100) score = candidate;
         }
+        if (score >= 0) return score;
+
         log.warn("Could not parse similarity score from Ollama response: {}", raw);
         return -1;
     }
