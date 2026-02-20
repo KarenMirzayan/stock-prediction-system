@@ -48,7 +48,7 @@ public class OllamaEducationClient {
                     "model", model,
                     "prompt", prompt,
                     "stream", false,
-                    "options", Map.of("temperature", 0.0, "num_predict", 20)
+                    "options", Map.of("temperature", 0.0, "num_predict", 500)
             );
 
             @SuppressWarnings("unchecked")

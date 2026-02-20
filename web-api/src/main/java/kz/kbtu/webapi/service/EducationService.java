@@ -101,15 +101,47 @@ public class EducationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found: " + articleId));
 
         List<Prediction> predictions = predictionRepository.findByArticleId(articleId);
-        String ourPrediction = buildAnalyticalExplanation(article, predictions);
 
-        int score = computeSimilarityScore(userPrediction, ourPrediction);
+        // Concatenated rationales are still used as the reference text for scoring
+        String referenceText = buildAnalyticalExplanation(article, predictions);
+        int score = computeSimilarityScore(userPrediction, referenceText);
         String feedback = generateFeedback(score, article.getMentionedSectors());
+
+        List<PredictionDetailDto> predictionItems = predictions.stream()
+                .map(this::toPredictionDetailDto)
+                .toList();
 
         return SimulationSubmitResultDto.builder()
                 .similarityScore(score)
                 .feedback(feedback)
-                .ourPrediction(ourPrediction)
+                .predictions(predictionItems)
+                .build();
+    }
+
+    private PredictionDetailDto toPredictionDetailDto(Prediction p) {
+        List<String> targets = new ArrayList<>();
+        if (p.getCompany() != null) {
+            targets.add(p.getCompany().getTicker());
+        }
+        p.getCompanies().stream()
+                .map(Company::getTicker)
+                .filter(t -> !targets.contains(t))
+                .forEach(targets::add);
+        p.getSectors().stream()
+                .map(EconomySector::getName)
+                .forEach(targets::add);
+        p.getCountries().stream()
+                .map(Country::getName)
+                .forEach(targets::add);
+
+        return PredictionDetailDto.builder()
+                .scope(p.getScope().name())
+                .direction(p.getDirection().name())
+                .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
+                .confidence(p.getConfidence() != null ? p.getConfidence() : 0)
+                .rationale(p.getRationale())
+                .targets(targets)
+                .evidence(p.getEvidence())
                 .build();
     }
 
