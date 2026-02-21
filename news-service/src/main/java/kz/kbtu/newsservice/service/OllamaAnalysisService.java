@@ -287,6 +287,7 @@ public class OllamaAnalysisService {
                                                LocalDate articleDate) {
         String today = LocalDate.now().toString();
         String articleDateStr = articleDate != null ? articleDate.toString() : today;
+        String availableSectors = getAvailableSectorsForPrompt();
 
         StringBuilder tickerLines = new StringBuilder();
         if (companyTickers.isEmpty()) {
@@ -305,6 +306,8 @@ public class OllamaAnalysisService {
                 COMPANIES IN THIS ARTICLE (Name → Ticker):
                 %s
 
+                AVAILABLE SECTORS: %s
+
                 EXTRACT ONLY these event types when a specific future date is mentioned:
                 - EARNINGS: Quarterly/annual earnings reports
                 - DIVIDEND: Dividend payment or ex-dividend dates
@@ -316,6 +319,7 @@ public class OllamaAnalysisService {
                 - Resolve relative dates ("next Tuesday", "this Friday") using the ARTICLE DATE
                 - Skip events with no clear specific date
                 - relevance: HIGH = major market-moving, MEDIUM = sector-relevant, LOW = minor
+                - sector: Use the sector NAME from the AVAILABLE SECTORS list above (e.g. "Technology", not "TECH")
 
                 Respond ONLY with a JSON array. Return [] if nothing qualifies.
 
@@ -327,14 +331,14 @@ public class OllamaAnalysisService {
                     "type": "EARNINGS | ECONOMIC | DIVIDEND | CONFERENCE",
                     "relevance": "HIGH | MEDIUM | LOW",
                     "companyTicker": "TICKER or null",
-                    "sector": "Technology | Finance | Energy | Healthcare | Consumer | Industrial | etc"
+                    "sector": "Sector name from AVAILABLE SECTORS list"
                   }
                 ]
 
                 ARTICLE TITLE: %s
                 ARTICLE: %s
                 """,
-                today, articleDateStr, tickerLines.toString(), today, title, content);
+                today, articleDateStr, tickerLines.toString(), availableSectors, today, title, content);
     }
 
     private List<MarketEventDto> parseEventResponse(String jsonResponse) {

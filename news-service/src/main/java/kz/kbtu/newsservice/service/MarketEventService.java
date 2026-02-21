@@ -3,8 +3,10 @@ package kz.kbtu.newsservice.service;
 import kz.kbtu.common.dto.MarketEventDto;
 import kz.kbtu.common.entity.Article;
 import kz.kbtu.common.entity.Company;
+import kz.kbtu.common.entity.EconomySector;
 import kz.kbtu.common.entity.MarketEvent;
 import kz.kbtu.newsservice.repository.CompanyRepository;
+import kz.kbtu.newsservice.repository.EconomySectorRepository;
 import kz.kbtu.newsservice.repository.MarketEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ public class MarketEventService {
 
     private final MarketEventRepository eventRepository;
     private final CompanyRepository companyRepository;
+    private final EconomySectorRepository sectorRepository;
 
     @Transactional
     public void saveEvents(List<MarketEventDto> dtos, Article sourceArticle) {
@@ -57,13 +60,23 @@ public class MarketEventService {
                 }
             }
 
+            // Resolve sector name against DB (try by name first, then by code)
+            final String rawSector = dto.getSector();
+            String sectorName = rawSector;
+            if (rawSector != null && !rawSector.isBlank()) {
+                sectorName = sectorRepository.findByNameIgnoreCase(rawSector)
+                        .or(() -> sectorRepository.findByCode(rawSector.toUpperCase()))
+                        .map(EconomySector::getName)
+                        .orElse(rawSector);
+            }
+
             MarketEvent event = MarketEvent.builder()
                     .title(dto.getTitle())
                     .eventDate(eventDate)
                     .eventTime(dto.getTime())
                     .type(parseType(dto.getType()))
                     .relevance(parseRelevance(dto.getRelevance()))
-                    .sector(dto.getSector())
+                    .sector(sectorName)
                     .company(company)
                     .sourceArticle(sourceArticle)
                     .build();
