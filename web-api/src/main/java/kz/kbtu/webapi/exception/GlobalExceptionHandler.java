@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.UNAUTHORIZED, "Invalid username or password");
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         var errors = ex.getBindingResult().getFieldErrors().stream()
