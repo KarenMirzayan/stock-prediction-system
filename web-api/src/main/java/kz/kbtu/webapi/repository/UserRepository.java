@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.subscribedCompanies c LEFT JOIN FETCH c.sectors LEFT JOIN FETCH c.country WHERE u.username = :username")
     Optional<User> findByUsernameWithSubscriptions(String username);
+
+    Optional<User> findByTelegramLinkToken(String telegramLinkToken);
 }

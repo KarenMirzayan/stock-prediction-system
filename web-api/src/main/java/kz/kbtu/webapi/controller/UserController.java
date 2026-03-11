@@ -2,8 +2,10 @@ package kz.kbtu.webapi.controller;
 
 import jakarta.validation.Valid;
 import kz.kbtu.webapi.dto.CompanyListItemDto;
+import kz.kbtu.webapi.dto.TelegramLinkResponse;
 import kz.kbtu.webapi.dto.UpdateProfileRequest;
 import kz.kbtu.webapi.dto.UserProfileDto;
+import kz.kbtu.webapi.service.TelegramService;
 import kz.kbtu.webapi.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final TelegramService telegramService;
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileDto> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
@@ -56,6 +59,21 @@ public class UserController {
         @PathVariable Long companyId
     ) {
         userService.unsubscribe(userDetails.getUsername(), companyId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/telegram/link")
+    public ResponseEntity<TelegramLinkResponse> initiateTelegramLink(
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return ResponseEntity.ok(telegramService.generateLinkToken(userDetails.getUsername()));
+    }
+
+    @DeleteMapping("/me/telegram/unlink")
+    public ResponseEntity<Void> unlinkTelegram(
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        telegramService.unlinkAccount(userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 }

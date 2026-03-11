@@ -33,6 +33,12 @@ ollama:
   url: ${OLLAMA_URL:http://localhost:11434}
   model: ${OLLAMA_MODEL:qwen2.5:14b}
 
+telegram:
+  bot-name: ${TELEGRAM_BOT_NAME}
+  bot-token: ${TELEGRAM_BOT_TOKEN}
+  bot-secret: ${TELEGRAM_BOT_SECRET}
+  link-token-expiry-minutes: 15
+
 logging:
   level:
     kz.kbtu.webapi: INFO

@@ -12,7 +12,9 @@ public record UserProfileDto(
     String lastName,
     String avatarUrl,
     Role role,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    boolean telegramLinked,
+    String telegramUsername
 ) {
     public static UserProfileDto from(User user) {
         return new UserProfileDto(
@@ -22,7 +24,9 @@ public record UserProfileDto(
             user.getLastName(),
             user.getAvatarUrl(),
             user.getRole(),
-            user.getCreatedAt()
+            user.getCreatedAt(),
+            user.getTelegramChatId() != null,
+            user.getTelegramUsername()
         );
     }
 }

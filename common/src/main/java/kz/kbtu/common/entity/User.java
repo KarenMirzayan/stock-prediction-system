@@ -3,6 +3,7 @@ package kz.kbtu.common.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -36,6 +37,18 @@ public class User extends BaseEntity {
     @Column(name = "role", nullable = false, length = 20)
     @Builder.Default
     private Role role = Role.USER;
+
+    @Column(name = "telegram_chat_id")
+    private Long telegramChatId;
+
+    @Column(name = "telegram_username", length = 100)
+    private String telegramUsername;
+
+    @Column(name = "telegram_link_token", length = 100)
+    private String telegramLinkToken;
+
+    @Column(name = "telegram_link_token_expiry")
+    private LocalDateTime telegramLinkTokenExpiry;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
