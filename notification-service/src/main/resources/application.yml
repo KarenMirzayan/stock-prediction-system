@@ -1,6 +1,6 @@
 spring:
   application:
-    name: news-service
+    name: notification-service
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
@@ -11,13 +11,13 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
+      maximum-pool-size: 5
+      minimum-idle: 2
       idle-timeout: 300000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -25,21 +25,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: ${NEWS_SERVICE_PORT}
+  port: ${NOTIFICATION_SERVICE_PORT:8082}
+
+telegram:
+  bot-token: ${TELEGRAM_BOT_TOKEN}
 
 logging:
   level:
-    kz.kbtu.newsservice: INFO
-    org.jsoup: WARN
-    com.rometools: WARN
-
-ollama:
-  url: ${OLLAMA_URL}
-  model: ${OLLAMA_MODEL}
-
-twelvedata:
-  api-key: ${TWELVE_DATA_API_KEY:demo}
-  base-url: https://api.twelvedata.com
-
-finnhub:
-  api-key: ${FINNHUB_API_KEY:demo}
+    kz.kbtu.notificationservice: INFO

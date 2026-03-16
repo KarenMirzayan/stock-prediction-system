@@ -38,7 +38,8 @@ public class TickerLookupService {
             "platforms", "technologies", "technology", "tech",
             "solutions", "services", "systems", "industries",
             "digital", "labs", "ventures", "capital", "financial",
-            "bancorp", "bancshares", "semiconductor", "semiconductors"
+            "bancorp", "bancshares", "semiconductor", "semiconductors",
+            "class", "a", "b", "c"  // share classes
     );
 
     private static final int MAX_RETRIES = 3;
@@ -58,14 +59,32 @@ public class TickerLookupService {
     /**
      * Looks up a company name against Twelve Data symbol_search API.
      * Returns the best match on a major exchange, or null if the company is not publicly traded.
+     * If the full name yields no match, retries with just the first word (e.g. "Meta" from "Meta Platforms Inc").
      */
     public TickerResult lookupTicker(String companyName) {
+        TickerResult result = searchTwelveData(companyName);
+        if (result != null) return result;
+
+        // Fallback: search with just the first word of the normalized name
+        String firstWord = normalizeName(companyName).split("\\s+")[0];
+        if (!firstWord.isEmpty() && !firstWord.equals(normalizeName(companyName))) {
+            log.info("Retrying lookup for '{}' with short query '{}'", companyName, firstWord);
+            return searchTwelveData(firstWord, companyName);
+        }
+        return null;
+    }
+
+    private TickerResult searchTwelveData(String searchQuery) {
+        return searchTwelveData(searchQuery, searchQuery);
+    }
+
+    private TickerResult searchTwelveData(String searchQuery, String originalName) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
                 String responseBody = webClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/symbol_search")
-                                .queryParam("symbol", companyName)
+                                .queryParam("symbol", searchQuery)
                                 .queryParam("outputsize", 10)
                                 .build())
                         .retrieve()
@@ -80,7 +99,7 @@ public class TickerLookupService {
                         .bodyToMono(String.class)
                         .block();
 
-                return parseBestMatch(responseBody, companyName);
+                return parseBestMatch(responseBody, originalName);
 
             } catch (RateLimitException e) {
                 long waitSeconds = e.retryAfterSeconds;
@@ -93,7 +112,7 @@ public class TickerLookupService {
                     return null;
                 }
             } catch (Exception e) {
-                log.error("Failed to lookup ticker for '{}' (attempt {}/{})", companyName, attempt, MAX_RETRIES, e);
+                log.error("Failed to lookup ticker for '{}' (attempt {}/{})", searchQuery, attempt, MAX_RETRIES, e);
                 if (attempt == MAX_RETRIES) return null;
             }
         }

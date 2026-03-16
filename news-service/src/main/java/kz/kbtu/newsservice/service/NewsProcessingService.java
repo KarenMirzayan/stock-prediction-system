@@ -1,12 +1,14 @@
 package kz.kbtu.newsservice.service;
 
 import kz.kbtu.common.dto.ArticleAnalysisDto;
+import kz.kbtu.common.dto.ArticleNotificationEvent;
 import kz.kbtu.common.dto.MarketEventDto;
 import kz.kbtu.common.dto.RssArticleDto;
 import kz.kbtu.common.entity.Article;
 import kz.kbtu.common.entity.Company;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -26,6 +28,7 @@ public class NewsProcessingService {
     private final OllamaAnalysisService ollamaService;
     private final ArticleService articleService;
     private final MarketEventService marketEventService;
+    private final KafkaTemplate<String, ArticleNotificationEvent> kafkaTemplate;
 
     public void processRssFeed(String feedUrl) {
         log.info("Starting RSS feed processing with LLM analysis and database persistence...");
@@ -115,6 +118,9 @@ public class NewsProcessingService {
                         marketEventService.saveEvents(events, article);
                     }
 
+                    // Step 6: Publish notification event to Kafka
+                    publishNotification(article);
+
                     // Step 7: Also save to file for backup/review
                     fileStorageService.saveArticleWithAnalysis(
                             rssArticle.getTitle(),
@@ -182,6 +188,22 @@ public class NewsProcessingService {
 
         // Process and persist
         return articleService.processAnalysis(article.getId(), analysis, ollamaService.getModelName());
+    }
+
+    private void publishNotification(Article article) {
+        Set<String> tickers = article.getMentionedCompanies().stream()
+                .map(Company::getTicker)
+                .collect(Collectors.toSet());
+        if (tickers.isEmpty()) return;
+
+        var event = ArticleNotificationEvent.builder()
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .url(article.getUrl())
+                .companyTickers(tickers)
+                .build();
+        kafkaTemplate.send("article-notifications", event);
+        log.info("Published notification event for article '{}' with tickers {}", article.getTitle(), tickers);
     }
 
     private java.util.Map<String, Object> convertAnalysisToMap(ArticleAnalysisDto analysis) {

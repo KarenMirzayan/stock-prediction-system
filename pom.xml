@@ -21,6 +21,7 @@
         <module>common</module>
         <module>news-service</module>
         <module>web-api</module>
+        <module>notification-service</module>
     </modules>
 
     <properties>
