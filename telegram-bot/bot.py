@@ -2,6 +2,7 @@ import logging
 import os
 
 import httpx
+import asyncio
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -65,4 +66,5 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     log.info("Bot is running...")
+    asyncio.set_event_loop(asyncio.new_event_loop())
     app.run_polling()
