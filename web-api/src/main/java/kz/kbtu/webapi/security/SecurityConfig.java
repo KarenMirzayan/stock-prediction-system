@@ -49,6 +49,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/education/simulations/*/submit").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/calendar/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/telegram/callback").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").authenticated()
                 .anyRequest().permitAll()
             )

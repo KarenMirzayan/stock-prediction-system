@@ -135,6 +135,7 @@ public class EducationService {
                 .forEach(targets::add);
 
         return PredictionDetailDto.builder()
+                .id(p.getId())
                 .scope(p.getScope().name())
                 .direction(p.getDirection().name())
                 .timeHorizon(p.getTimeHorizon() != null ? p.getTimeHorizon().name() : null)
