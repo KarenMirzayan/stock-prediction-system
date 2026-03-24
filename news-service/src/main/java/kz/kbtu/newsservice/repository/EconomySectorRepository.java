@@ -12,7 +12,7 @@ public interface EconomySectorRepository extends JpaRepository<EconomySector, Lo
     
     Optional<EconomySector> findByCode(String code);
     
-    Optional<EconomySector> findByNameIgnoreCase(String name);
+    Optional<EconomySector> findFirstByNameIgnoreCase(String name);
     
     List<EconomySector> findByCodeIn(List<String> codes);
     

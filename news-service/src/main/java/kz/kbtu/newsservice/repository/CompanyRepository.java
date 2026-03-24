@@ -22,15 +22,17 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     
     boolean existsByTicker(String ticker);
     
-    @Query("SELECT c FROM Company c LEFT JOIN FETCH c.sectors WHERE c.ticker = :ticker")
-    Optional<Company> findByTickerWithSectors(@Param("ticker") String ticker);
-    
+    @Query("SELECT c FROM Company c LEFT JOIN FETCH c.sector WHERE c.ticker = :ticker")
+    Optional<Company> findByTickerWithSector(@Param("ticker") String ticker);
+
     @Query("SELECT c FROM Company c LEFT JOIN FETCH c.country WHERE c.ticker = :ticker")
     Optional<Company> findByTickerWithCountry(@Param("ticker") String ticker);
-    
-    @Query("SELECT c FROM Company c JOIN c.sectors s WHERE s.code = :sectorCode")
+
+    @Query("SELECT c FROM Company c WHERE c.sector.code = :sectorCode")
     List<Company> findBySectorCode(@Param("sectorCode") String sectorCode);
     
     @Query("SELECT c FROM Company c WHERE c.country.code = :countryCode")
     List<Company> findByCountryCode(@Param("countryCode") String countryCode);
+
+    List<Company> findByShareOutstandingIsNull();
 }

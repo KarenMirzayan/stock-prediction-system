@@ -240,7 +240,7 @@ public class ArticleService {
         }
         // Try by code first (e.g., "US", "CN")
         return countryRepository.findByCode(nameOrCode.toUpperCase())
-                .or(() -> countryRepository.findByNameIgnoreCase(nameOrCode));
+                .or(() -> countryRepository.findFirstByNameIgnoreCase(nameOrCode));
     }
 
     private Optional<EconomySector> findSector(String codeOrName) {
@@ -249,7 +249,7 @@ public class ArticleService {
         }
         // Try by code first (e.g., "TECH", "ENERGY")
         return sectorRepository.findByCode(codeOrName.toUpperCase())
-                .or(() -> sectorRepository.findByNameIgnoreCase(codeOrName));
+                .or(() -> sectorRepository.findFirstByNameIgnoreCase(codeOrName));
     }
 
     private Article.Sentiment parseSentiment(String sentiment) {

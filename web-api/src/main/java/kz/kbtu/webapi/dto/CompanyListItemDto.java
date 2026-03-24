@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,5 +18,5 @@ public class CompanyListItemDto {
     private String websiteUrl;
     private Double marketCap; // in millions
     private String country;   // country code, e.g. "US"
-    private List<String> sectors;
+    private String sector;
 }

@@ -14,7 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByUsername(String username);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.subscribedCompanies c LEFT JOIN FETCH c.sectors LEFT JOIN FETCH c.country WHERE u.username = :username")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.subscribedCompanies c LEFT JOIN FETCH c.sector LEFT JOIN FETCH c.country WHERE u.username = :username")
     Optional<User> findByUsernameWithSubscriptions(String username);
 
     Optional<User> findByTelegramLinkToken(String telegramLinkToken);

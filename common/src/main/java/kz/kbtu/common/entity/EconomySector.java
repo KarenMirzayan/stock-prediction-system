@@ -27,7 +27,7 @@ public class EconomySector extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
-    @ManyToMany(mappedBy = "sectors", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "sector", fetch = FetchType.LAZY)
     @Builder.Default
     private Set<Company> companies = new HashSet<>();
 

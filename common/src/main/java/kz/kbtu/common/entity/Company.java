@@ -39,6 +39,12 @@ public class Company extends BaseEntity {
     @Column(name = "market_cap")
     private Double marketCap; // In millions, from Finnhub
 
+    @Column(name = "share_outstanding")
+    private Double shareOutstanding; // millions, from Finnhub profile2
+
+    @Column(name = "daily_change_percent")
+    private Double dailyChangePercent; // from Finnhub /quote dp field
+
     @Column(name = "ipo_date", length = 10)
     private String ipoDate;
 
@@ -46,27 +52,11 @@ public class Company extends BaseEntity {
     @JoinColumn(name = "country_id")
     private Country country;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-        name = "company_sectors",
-        joinColumns = @JoinColumn(name = "company_id"),
-        inverseJoinColumns = @JoinColumn(name = "sector_id")
-    )
-    @Builder.Default
-    private Set<EconomySector> sectors = new HashSet<>();
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sector_id")
+    private EconomySector sector;
 
     @OneToMany(mappedBy = "company", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @Builder.Default
     private Set<Prediction> predictions = new HashSet<>();
-
-    // Helper methods for managing sectors
-    public void addSector(EconomySector sector) {
-        this.sectors.add(sector);
-        sector.getCompanies().add(this);
-    }
-
-    public void removeSector(EconomySector sector) {
-        this.sectors.remove(sector);
-        sector.getCompanies().remove(this);
-    }
 }

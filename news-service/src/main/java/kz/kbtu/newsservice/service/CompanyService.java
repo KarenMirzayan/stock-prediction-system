@@ -1,7 +1,5 @@
 package kz.kbtu.newsservice.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import kz.kbtu.common.dto.CompanyInfoDto;
 import kz.kbtu.common.entity.Company;
 import kz.kbtu.common.entity.Country;
@@ -28,8 +26,6 @@ public class CompanyService {
     private final TickerLookupService tickerLookupService;
     private final FinnhubService finnhubService;
     private final WikipediaService wikipediaService;
-    private final ObjectMapper objectMapper;
-
     private final WebClient ollamaClient;
 
     @Value("${ollama.model:qwen2.5:14b}")
@@ -47,7 +43,6 @@ public class CompanyService {
         this.tickerLookupService = tickerLookupService;
         this.finnhubService = finnhubService;
         this.wikipediaService = wikipediaService;
-        this.objectMapper = new ObjectMapper();
         this.ollamaClient = WebClient.builder()
                 .baseUrl("http://localhost:11434")
                 .build();
@@ -127,12 +122,23 @@ public class CompanyService {
             builder.logoUrl(profile.logoUrl())
                     .websiteUrl(profile.webUrl())
                     .marketCap(profile.marketCap())
+                    .shareOutstanding(profile.shareOutstanding())
                     .ipoDate(profile.ipoDate());
             finnhubIndustry = profile.finnhubIndustry();
 
             // Use Finnhub country code if available (more reliable 2-letter code)
             if (profile.country() != null && profile.country().length() == 2) {
                 builder.countryCode(profile.country());
+                builder.countryName(mapCodeToCountryName(profile.country()));
+            }
+        }
+
+        // Finnhub: live quote (daily change %, recompute market cap from live price)
+        FinnhubService.StockQuote quote = finnhubService.getQuote(tickerResult.ticker());
+        if (quote != null) {
+            builder.dailyChangePercent(quote.changePercent());
+            if (profile != null && profile.shareOutstanding() > 0) {
+                builder.marketCap(quote.currentPrice() * profile.shareOutstanding());
             }
         }
 
@@ -148,20 +154,20 @@ public class CompanyService {
             builder.description("Publicly traded on " + tickerResult.exchange());
         }
 
-        // LLM: map Finnhub industry to our sector codes
-        List<String> sectorCodes = mapIndustryToSectors(finnhubIndustry);
-        builder.sectorCodes(sectorCodes);
+        // LLM: map Finnhub industry to our sector code
+        String sectorCode = mapIndustryToSector(finnhubIndustry);
+        builder.sectorCode(sectorCode);
 
         return builder.build();
     }
 
     /**
-     * Uses LLM to map a Finnhub industry string to our economy sector codes.
+     * Uses LLM to map a Finnhub industry string to our economy sector code.
      * The response is tiny (~20 tokens) so truncation is not a concern.
      */
-    private List<String> mapIndustryToSectors(String finnhubIndustry) {
+    private String mapIndustryToSector(String finnhubIndustry) {
         if (finnhubIndustry == null || finnhubIndustry.isBlank()) {
-            return List.of();
+            return null;
         }
 
         List<String> availableSectors = sectorRepository.findAll().stream()
@@ -169,31 +175,27 @@ public class CompanyService {
                 .collect(Collectors.toList());
 
         String prompt = String.format("""
-            Map the following industry to 1-3 sector codes from the available list.
+            Map the following industry to the single best-matching sector code from the available list.
 
             INDUSTRY: %s
 
             AVAILABLE SECTORS:
             %s
 
-            Respond ONLY with a JSON array of sector codes. Example: ["TECH", "CONSUMER"]
+            Respond ONLY with the sector code as a plain string. Example: TECH
             """, finnhubIndustry, String.join(", ", availableSectors));
 
         try {
             String response = generateFromOllama(prompt, 512);
             log.info("LLM response for sector finding: {}, industry: {}", response, finnhubIndustry);
-            String cleaned = cleanJsonResponse(response);
-            JsonNode root = objectMapper.readTree(cleaned);
-
-            List<String> codes = new ArrayList<>();
-            if (root.isArray()) {
-                root.forEach(item -> codes.add(item.asText()));
-            }
-            log.info("Mapped industry '{}' → sectors: {}", finnhubIndustry, codes);
-            return codes;
+            // Strip qwen3 <think>...</think> block, then extract the sector code
+            String cleaned = response.replaceAll("(?s)<think>.*?</think>", "").strip();
+            String code = cleaned.replaceAll("[\"\\s]", "");
+            log.info("Mapped industry '{}' → sector: {}", finnhubIndustry, code);
+            return code;
         } catch (Exception e) {
-            log.warn("LLM failed to map industry '{}' to sectors: {}", finnhubIndustry, e.getMessage());
-            return List.of();
+            log.warn("LLM failed to map industry '{}' to sector: {}", finnhubIndustry, e.getMessage());
+            return null;
         }
     }
 
@@ -226,11 +228,9 @@ public class CompanyService {
     protected Company createCompanyFromDto(CompanyInfoDto dto) {
         Country country = getOrCreateCountry(dto.getCountryCode(), dto.getCountryName());
 
-        Set<EconomySector> sectors = new HashSet<>();
-        if (dto.getSectorCodes() != null) {
-            for (String sectorCode : dto.getSectorCodes()) {
-                sectorRepository.findByCode(sectorCode).ifPresent(sectors::add);
-            }
+        EconomySector sector = null;
+        if (dto.getSectorCode() != null) {
+            sector = sectorRepository.findByCode(dto.getSectorCode()).orElse(null);
         }
 
         Company company = Company.builder()
@@ -241,16 +241,18 @@ public class CompanyService {
                 .logoUrl(dto.getLogoUrl())
                 .websiteUrl(dto.getWebsiteUrl())
                 .marketCap(dto.getMarketCap())
+                .shareOutstanding(dto.getShareOutstanding())
+                .dailyChangePercent(dto.getDailyChangePercent())
                 .ipoDate(dto.getIpoDate())
                 .country(country)
-                .sectors(sectors)
+                .sector(sector)
                 .build();
 
         Company saved = companyRepository.save(company);
-        log.info("Created new company: {} ({}) on {} [logo={}, sectors={}]",
+        log.info("Created new company: {} ({}) on {} [logo={}, sector={}]",
                 saved.getName(), saved.getTicker(), saved.getExchange(),
                 saved.getLogoUrl() != null ? "yes" : "no",
-                dto.getSectorCodes());
+                dto.getSectorCode());
 
         return saved;
     }
@@ -291,18 +293,33 @@ public class CompanyService {
         };
     }
 
-    private String cleanJsonResponse(String response) {
-        String cleaned = response.trim();
-        if (cleaned.startsWith("```json")) {
-            cleaned = cleaned.substring(7);
-        }
-        if (cleaned.startsWith("```")) {
-            cleaned = cleaned.substring(3);
-        }
-        if (cleaned.endsWith("```")) {
-            cleaned = cleaned.substring(0, cleaned.length() - 3);
-        }
-        return cleaned.trim();
+    private String mapCodeToCountryName(String code) {
+        return switch (code.toUpperCase()) {
+            case "US" -> "United States";
+            case "GB" -> "United Kingdom";
+            case "JP" -> "Japan";
+            case "CN" -> "China";
+            case "DE" -> "Germany";
+            case "CA" -> "Canada";
+            case "AU" -> "Australia";
+            case "KR" -> "South Korea";
+            case "TW" -> "Taiwan";
+            case "HK" -> "Hong Kong";
+            case "IN" -> "India";
+            case "FR" -> "France";
+            case "CH" -> "Switzerland";
+            case "SG" -> "Singapore";
+            case "BR" -> "Brazil";
+            case "LU" -> "Luxembourg";
+            case "IE" -> "Ireland";
+            case "NL" -> "Netherlands";
+            case "IL" -> "Israel";
+            case "SE" -> "Sweden";
+            case "FI" -> "Finland";
+            case "DK" -> "Denmark";
+            case "NO" -> "Norway";
+            default -> code;
+        };
     }
 
     public Optional<Company> findByTicker(String ticker) {

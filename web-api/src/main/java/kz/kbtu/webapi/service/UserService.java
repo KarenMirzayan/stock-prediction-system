@@ -60,7 +60,7 @@ public class UserService {
                 .websiteUrl(c.getWebsiteUrl())
                 .marketCap(c.getMarketCap())
                 .country(c.getCountry() != null ? c.getCountry().getCode() : null)
-                .sectors(c.getSectors().stream().map(s -> s.getName()).toList())
+                .sector(c.getSector() != null ? c.getSector().getName() : null)
                 .build())
             .toList();
     }

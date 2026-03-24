@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,8 +17,10 @@ public class CompanyInfoDto {
     private String logoUrl;
     private String websiteUrl;
     private Double marketCap;
+    private Double shareOutstanding;
+    private Double dailyChangePercent;
     private String ipoDate;
     private String countryCode;
     private String countryName;
-    private List<String> sectorCodes;
+    private String sectorCode;
 }

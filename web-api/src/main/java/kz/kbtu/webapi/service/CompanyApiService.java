@@ -1,7 +1,6 @@
 package kz.kbtu.webapi.service;
 
 import kz.kbtu.common.entity.Company;
-import kz.kbtu.common.entity.EconomySector;
 import kz.kbtu.webapi.dto.CompanyDetailDto;
 import kz.kbtu.webapi.dto.CompanyListItemDto;
 import kz.kbtu.webapi.repository.CompanyRepository;
@@ -40,7 +39,7 @@ public class CompanyApiService {
                 .websiteUrl(c.getWebsiteUrl())
                 .marketCap(c.getMarketCap())
                 .country(c.getCountry() != null ? c.getCountry().getCode() : null)
-                .sectors(c.getSectors().stream().map(EconomySector::getCode).sorted().toList())
+                .sector(c.getSector() != null ? c.getSector().getCode() : null)
                 .build();
     }
 
@@ -55,7 +54,7 @@ public class CompanyApiService {
                 .marketCap(c.getMarketCap())
                 .country(c.getCountry() != null ? c.getCountry().getCode() : null)
                 .countryName(c.getCountry() != null ? c.getCountry().getName() : null)
-                .sectors(c.getSectors().stream().map(EconomySector::getCode).sorted().toList())
+                .sector(c.getSector() != null ? c.getSector().getCode() : null)
                 .description(c.getDescription())
                 .ipoDate(c.getIpoDate())
                 .build();

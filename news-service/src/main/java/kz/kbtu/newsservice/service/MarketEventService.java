@@ -64,7 +64,7 @@ public class MarketEventService {
             final String rawSector = dto.getSector();
             String sectorName = rawSector;
             if (rawSector != null && !rawSector.isBlank()) {
-                sectorName = sectorRepository.findByNameIgnoreCase(rawSector)
+                sectorName = sectorRepository.findFirstByNameIgnoreCase(rawSector)
                         .or(() -> sectorRepository.findByCode(rawSector.toUpperCase()))
                         .map(EconomySector::getName)
                         .orElse(rawSector);
