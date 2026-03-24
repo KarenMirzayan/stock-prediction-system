@@ -12,6 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PredictionDetailDto {
+    private Long id;
     private String scope;
     private String direction;
     private String timeHorizon;
