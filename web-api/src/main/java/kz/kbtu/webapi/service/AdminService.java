@@ -1,17 +1,25 @@
 package kz.kbtu.webapi.service;
 
+import kz.kbtu.common.entity.GlossaryTerm;
 import kz.kbtu.common.entity.Prediction;
+import kz.kbtu.webapi.dto.GlossaryTermDto;
 import kz.kbtu.webapi.dto.admin.*;
 import kz.kbtu.webapi.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminService {
 
     private final ArticleRepository articleRepository;
+    private final OllamaEducationClient ollamaClient;
     private final PredictionRepository predictionRepository;
     private final CompanyRepository companyRepository;
     private final GlossaryTermRepository glossaryTermRepository;
@@ -113,6 +121,44 @@ public class AdminService {
             throw new IllegalArgumentException("Glossary term not found");
         }
         glossaryTermRepository.deleteById(id);
+    }
+
+    @Transactional
+    public GlossaryTermDto createGlossaryTerm(CreateGlossaryTermRequest request) {
+        String definition = request.getDefinition();
+        if (definition == null || definition.isBlank()) {
+            definition = ollamaClient.generateDefinition(request.getTerm(), request.getCategory());
+            if (definition == null) {
+                throw new IllegalStateException("Could not generate definition — Ollama is unavailable");
+            }
+        }
+        var term = GlossaryTerm.builder()
+                .term(request.getTerm())
+                .definition(definition)
+                .category(request.getCategory())
+                .build();
+        term = glossaryTermRepository.save(term);
+        return GlossaryTermDto.builder()
+                .id(term.getId())
+                .term(term.getTerm())
+                .definition(term.getDefinition())
+                .category(term.getCategory())
+                .build();
+    }
+
+    public List<GlossaryTermDto> generateGlossaryTerms(GenerateGlossaryRequest request) {
+        List<GlossaryTermDto> results = new ArrayList<>();
+        for (var entry : request.getTerms()) {
+            try {
+                var createReq = new CreateGlossaryTermRequest();
+                createReq.setTerm(entry.getTerm());
+                createReq.setCategory(entry.getCategory());
+                results.add(createGlossaryTerm(createReq));
+            } catch (Exception e) {
+                log.warn("Failed to generate glossary term '{}': {}", entry.getTerm(), e.getMessage());
+            }
+        }
+        return results;
     }
 
     // ── Quiz Question ──

@@ -67,6 +67,48 @@ public class OllamaEducationClient {
         return -1;
     }
 
+    /**
+     * Generates a concise financial glossary definition for a given term.
+     *
+     * @return the definition text, or null if Ollama is unavailable
+     */
+    public String generateDefinition(String term, String category) {
+        String prompt = String.format(
+                "You are a financial education assistant. " +
+                "Write a clear, concise definition (2-3 sentences) for the following financial/market term.\n\n" +
+                "Term: %s\nCategory: %s\n\n" +
+                "Respond with ONLY the definition text. No prefix, no quotes, no \"Definition:\" label.",
+                term, category
+        );
+
+        try {
+            Map<String, Object> request = Map.of(
+                    "model", model,
+                    "prompt", prompt,
+                    "stream", false,
+                    "options", Map.of("temperature", 0.3, "num_predict", 300)
+            );
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restClient.post()
+                    .uri("/api/generate")
+                    .body(request)
+                    .retrieve()
+                    .body(Map.class);
+
+            if (response != null && response.containsKey("response")) {
+                String raw = (String) response.get("response");
+                return raw
+                        .replaceAll("(?s)<think>.*?</think>", "")
+                        .replaceAll("(?s)<think>.*$", "")
+                        .trim();
+            }
+        } catch (Exception e) {
+            log.warn("Ollama unavailable for glossary generation: {}", e.getMessage());
+        }
+        return null;
+    }
+
     private int parseScore(String raw) {
         // Strip complete <think>...</think> blocks, then any unclosed <think>... tail
         // (unclosed = truncated response that never emitted </think>)

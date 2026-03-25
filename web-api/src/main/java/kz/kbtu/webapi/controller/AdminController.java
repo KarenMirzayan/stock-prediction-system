@@ -1,11 +1,14 @@
 package kz.kbtu.webapi.controller;
 
 import jakarta.validation.Valid;
+import kz.kbtu.webapi.dto.GlossaryTermDto;
 import kz.kbtu.webapi.dto.admin.*;
 import kz.kbtu.webapi.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -60,6 +63,18 @@ public class AdminController {
     }
 
     // ── Glossary ──
+
+    @PostMapping("/glossary")
+    public ResponseEntity<GlossaryTermDto> createGlossaryTerm(
+            @Valid @RequestBody CreateGlossaryTermRequest request) {
+        return ResponseEntity.ok(adminService.createGlossaryTerm(request));
+    }
+
+    @PostMapping("/glossary/generate")
+    public ResponseEntity<List<GlossaryTermDto>> generateGlossaryTerms(
+            @Valid @RequestBody GenerateGlossaryRequest request) {
+        return ResponseEntity.ok(adminService.generateGlossaryTerms(request));
+    }
 
     @PutMapping("/glossary/{id}")
     public ResponseEntity<Void> updateGlossaryTerm(@PathVariable Long id,
