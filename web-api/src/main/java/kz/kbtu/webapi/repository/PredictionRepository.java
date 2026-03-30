@@ -25,4 +25,9 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "LEFT JOIN FETCH c.sector " +
            "WHERE p.createdAt >= :since AND p.company IS NOT NULL")
     List<Prediction> findRecentCompanyPredictions(@Param("since") LocalDateTime since);
+
+    @Query("SELECT p FROM Prediction p " +
+           "WHERE p.company.id = :companyId AND p.createdAt >= :since")
+    List<Prediction> findRecentByCompanyId(@Param("companyId") Long companyId,
+                                           @Param("since") LocalDateTime since);
 }
