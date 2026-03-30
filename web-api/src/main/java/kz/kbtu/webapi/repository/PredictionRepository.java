@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -18,4 +19,10 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "LEFT JOIN FETCH p.countries " +
            "WHERE p.article.id = :articleId")
     List<Prediction> findByArticleId(@Param("articleId") Long articleId);
+
+    @Query("SELECT DISTINCT p FROM Prediction p " +
+           "LEFT JOIN FETCH p.company c " +
+           "LEFT JOIN FETCH c.sector " +
+           "WHERE p.createdAt >= :since AND p.company IS NOT NULL")
+    List<Prediction> findRecentCompanyPredictions(@Param("since") LocalDateTime since);
 }
