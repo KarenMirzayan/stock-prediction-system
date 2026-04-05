@@ -32,4 +32,11 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
         @Param("scope") Prediction.PredictionScope scope,
         @Param("direction") Prediction.Direction direction
     );
+
+    @Query("SELECT p FROM Prediction p LEFT JOIN FETCH p.company LEFT JOIN FETCH p.companies " +
+           "WHERE p.verifiedAt IS NULL " +
+           "AND p.scope IN (kz.kbtu.common.entity.Prediction$PredictionScope.COMPANY, kz.kbtu.common.entity.Prediction$PredictionScope.MULTI_TICKER) " +
+           "AND p.direction IN (kz.kbtu.common.entity.Prediction$Direction.BULLISH, kz.kbtu.common.entity.Prediction$Direction.BEARISH, kz.kbtu.common.entity.Prediction$Direction.NEUTRAL) " +
+           "AND p.timeHorizon IS NOT NULL")
+    List<Prediction> findUnverifiedPredictions();
 }

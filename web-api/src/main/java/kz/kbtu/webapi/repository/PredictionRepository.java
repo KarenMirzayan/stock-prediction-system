@@ -30,4 +30,12 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "WHERE p.company.id = :companyId AND p.createdAt >= :since")
     List<Prediction> findRecentByCompanyId(@Param("companyId") Long companyId,
                                            @Param("since") LocalDateTime since);
+
+    @Query("SELECT DISTINCT p FROM Prediction p " +
+           "LEFT JOIN FETCH p.company " +
+           "LEFT JOIN FETCH p.companies " +
+           "LEFT JOIN FETCH p.article " +
+           "WHERE p.verifiedAt IS NOT NULL " +
+           "ORDER BY p.verifiedAt DESC")
+    List<Prediction> findVerifiedPredictions();
 }

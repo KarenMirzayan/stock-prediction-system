@@ -3,6 +3,7 @@ package kz.kbtu.common.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +14,8 @@ import java.util.Set;
         @Index(name = "idx_prediction_article", columnList = "article_id"),
         @Index(name = "idx_prediction_company", columnList = "company_id"),
         @Index(name = "idx_prediction_direction", columnList = "direction"),
-        @Index(name = "idx_prediction_confidence", columnList = "confidence")
+        @Index(name = "idx_prediction_confidence", columnList = "confidence"),
+        @Index(name = "idx_prediction_verified", columnList = "verified_at")
 })
 @Getter
 @Setter
@@ -85,6 +87,16 @@ public class Prediction extends BaseEntity {
     @Column(name = "evidence", length = 1000)
     @Builder.Default
     private List<String> evidence = new ArrayList<>();
+
+    // Verification fields (populated by PredictionVerificationScheduler)
+    @Column(name = "actual_movement_pct")
+    private Double actualMovementPct;
+
+    @Column(name = "accurate")
+    private Boolean accurate;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
 
     // Enums
     public enum PredictionScope {
