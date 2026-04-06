@@ -43,3 +43,13 @@ twelvedata:
 
 finnhub:
   api-key: ${FINNHUB_API_KEY:demo}
+
+scheduler:
+  news-scrape:
+    enabled: ${SCHEDULER_NEWS_SCRAPE:false}
+  reddit-buzz:
+    enabled: ${SCHEDULER_REDDIT_BUZZ:false}
+  quote-refresh:
+    enabled: ${SCHEDULER_QUOTE_REFRESH:false}
+  prediction-verification:
+    enabled: ${SCHEDULER_PREDICTION_VERIFICATION:false}

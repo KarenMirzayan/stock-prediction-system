@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -54,6 +55,11 @@ public class ForecastAnalyticsService {
 
     public List<ForecastHistoryItemDto> getHistory() {
         return predictionRepository.findVerifiedPredictions().stream()
+                .sorted(Comparator.comparing((Prediction p) -> {
+                    if (p.getArticle() != null && p.getArticle().getPublishedAt() != null)
+                        return p.getArticle().getPublishedAt();
+                    return p.getCreatedAt();
+                }).reversed())
                 .map(this::toHistoryItem)
                 .toList();
     }
@@ -74,8 +80,11 @@ public class ForecastAnalyticsService {
             companies = List.of();
         }
 
+        Long articleId = p.getArticle() != null ? p.getArticle().getId() : null;
+
         return ForecastHistoryItemDto.builder()
                 .id(p.getId())
+                .articleId(articleId)
                 .date(date)
                 .headline(headline)
                 .forecast(mapDirection(p.getDirection()))
