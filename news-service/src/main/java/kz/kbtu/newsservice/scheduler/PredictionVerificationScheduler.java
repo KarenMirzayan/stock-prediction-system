@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -25,13 +26,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "scheduler.prediction-verification.enabled", havingValue = "true")
 public class PredictionVerificationScheduler {
 
     private final PredictionRepository predictionRepository;
     private final StockPriceService stockPriceService;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    private static final int PER_RUN_API_BUDGET = 15; // ~2 min of API calls per 30-min run (800/day shared with TickerLookupService)
+    private static final int PER_RUN_API_BUDGET = 45; // ~2 min of API calls per 30-min run (800/day shared with TickerLookupService)
     private static final long THROTTLE_MS = 8_000; // ~7.5 calls/min, under 8/min limit
     private static final int STALENESS_DAYS = 180;
 
@@ -173,9 +175,9 @@ public class PredictionVerificationScheduler {
         if (horizon == null) return null;
 
         return switch (horizon) {
-            case SHORT_TERM -> prediction.getCreatedAt().plusDays(7);
-            case MID_TERM -> prediction.getCreatedAt().plusDays(30);
-            case LONG_TERM -> prediction.getCreatedAt().plusDays(90);
+            case SHORT_TERM -> prediction.getCreatedAt().plusDays(1);
+            case MID_TERM -> prediction.getCreatedAt().plusDays(3);
+            case LONG_TERM -> prediction.getCreatedAt().plusDays(7);
         };
     }
 

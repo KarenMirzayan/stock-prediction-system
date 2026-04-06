@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ForecastHistoryItemDto {
     private Long id;
+    private Long articleId;
     private String date;
     private String headline;
     private String forecast;

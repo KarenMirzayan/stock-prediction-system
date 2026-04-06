@@ -6,12 +6,15 @@ import kz.kbtu.common.dto.MarketEventDto;
 import kz.kbtu.common.dto.RssArticleDto;
 import kz.kbtu.common.entity.Article;
 import kz.kbtu.common.entity.Company;
+import kz.kbtu.common.entity.Country;
+import kz.kbtu.common.entity.EconomySector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -196,11 +199,20 @@ public class NewsProcessingService {
                 .collect(Collectors.toSet());
         if (tickers.isEmpty()) return;
 
+        List<String> tags = new ArrayList<>();
+        article.getMentionedSectors().stream()
+                .map(EconomySector::getName)
+                .forEach(tags::add);
+        article.getMentionedCountries().stream()
+                .map(Country::getName)
+                .forEach(tags::add);
+
         var event = ArticleNotificationEvent.builder()
+                .articleId(article.getId())
                 .title(article.getTitle())
                 .summary(article.getSummary())
-                .url(article.getUrl())
                 .companyTickers(tickers)
+                .tags(tags)
                 .build();
         kafkaTemplate.send("article-notifications", event);
         log.info("Published notification event for article '{}' with tickers {}", article.getTitle(), tickers);

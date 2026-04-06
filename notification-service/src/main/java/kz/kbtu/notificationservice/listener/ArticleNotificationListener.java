@@ -53,10 +53,15 @@ public class ArticleNotificationListener {
         if (event.getSummary() != null && !event.getSummary().isBlank()) {
             sb.append(escapeHtml(event.getSummary())).append("\n\n");
         }
-        if (event.getUrl() != null && !event.getUrl().isBlank()) {
-            sb.append("\uD83D\uDD17 <a href=\"").append(event.getUrl()).append("\">Read full article</a>\n\n");
+        if (event.getTags() != null && !event.getTags().isEmpty()) {
+            sb.append(event.getTags().stream()
+                    .map(tag -> "#" + escapeHtml(tag.replace(" ", "_")))
+                    .collect(Collectors.joining("  ")));
+            sb.append("\n\n");
         }
-        sb.append("\uD83D\uDCCC You received this because you subscribed to <b>")
+        String articleUrl = "http://localhost:4200/news/" + event.getArticleId();
+        sb.append("\uD83D\uDD17 <a href=\"").append(articleUrl).append("\">Read on InvestTracker</a>\n\n");
+        sb.append("\uD83D\uDCCC <b>Reason:</b> You are subscribed to <b>")
           .append(escapeHtml(companies)).append("</b>");
         return sb.toString();
     }
