@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import org.springframework.http.MediaType;
+
 import java.util.Map;
 
 @Service
@@ -23,6 +25,7 @@ public class TelegramSender {
         try {
             restClient.post()
                     .uri("/sendMessage")
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML"))
                     .retrieve()
                     .toBodilessEntity();

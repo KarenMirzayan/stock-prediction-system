@@ -33,7 +33,7 @@ public class PredictionVerificationScheduler {
     private final StockPriceService stockPriceService;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    private static final int PER_RUN_API_BUDGET = 45; // ~2 min of API calls per 30-min run (800/day shared with TickerLookupService)
+    private static final int PER_RUN_API_BUDGET = 21; // ~2 min of API calls per 30-min run (800/day shared with TickerLookupService)
     private static final long THROTTLE_MS = 8_000; // ~7.5 calls/min, under 8/min limit
     private static final int STALENESS_DAYS = 180;
 

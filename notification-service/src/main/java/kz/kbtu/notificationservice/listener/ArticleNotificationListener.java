@@ -59,8 +59,7 @@ public class ArticleNotificationListener {
                     .collect(Collectors.joining("  ")));
             sb.append("\n\n");
         }
-        String articleUrl = "http://localhost:4200/news/" + event.getArticleId();
-        sb.append("\uD83D\uDD17 <a href=\"").append(articleUrl).append("\">Read on InvestTracker</a>\n\n");
+        sb.append("\uD83D\uDD17 http://localhost:4200/news/").append(event.getArticleId()).append("\n\n");
         sb.append("\uD83D\uDCCC <b>Reason:</b> You are subscribed to <b>")
           .append(escapeHtml(companies)).append("</b>");
         return sb.toString();
